@@ -1,0 +1,2267 @@
+{
+  "name": "targets/blinky-nordic_pca10040",
+  "build_time": "2019-06-17T17:16:49-07:00",
+  "build_version": "9.0.0.0",
+  "id": "8eb006d574ace63cce18a1f2d8f0f2645f1a0e8630a39fb86bbfbb805d4cd3b9",
+  "image": "/Users/ccollins/proj/myproj/bin/targets/blinky-nordic_pca10040/app/apps/blinky/blinky.img",
+  "image_hash": "8eb006d574ace63cce18a1f2d8f0f2645f1a0e8630a39fb86bbfbb805d4cd3b9",
+  "loader": "",
+  "loader_hash": "",
+  "pkgs": [
+    {
+      "name": "apps/blinky",
+      "repo": "my_project"
+    },
+    {
+      "name": "blinky-nordic_pca10040-sysinit-app",
+      "repo": "my_project"
+    },
+    {
+      "name": "@apache-mynewt-core/compiler/arm-none-eabi-m4",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/bsp/nordic_pca10040",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/cmsis-core",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/drivers/uart",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/drivers/uart/uart_hal",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/hal",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/mcu/nordic",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/hw/mcu/nordic/nrf52xxx",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/kernel/os",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/libc/baselibc",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/console/stub",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/defs",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/flash_map",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/log/common",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/log/modlog",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/log/stub",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/mfg",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/sys",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/sysdown",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/sys/sysinit",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "targets/blinky-nordic_pca10040",
+      "repo": "my_project"
+    },
+    {
+      "name": "@apache-mynewt-core/util/mem",
+      "repo": "apache-mynewt-core"
+    },
+    {
+      "name": "@apache-mynewt-core/util/rwlock",
+      "repo": "apache-mynewt-core"
+    }
+  ],
+  "target": [
+    "target.app=apps/blinky",
+    "target.bsp=@apache-mynewt-core/hw/bsp/nordic_pca10040",
+    "target.build_profile=optimized"
+  ],
+  "repos": [
+    {
+      "name": "apache-mynewt-core",
+      "commit": "fa5e4c31b0bea2b107747e3b0d40002d3bef4132",
+      "url": "git@github.com:apache/mynewt-core.git"
+    },
+    {
+      "name": "my_project",
+      "commit": "UNKNOWN"
+    }
+  ],
+  "syscfg": {
+    "ADC_0": "0",
+    "ADC_0_REFMV_0": "0",
+    "APP_NAME": "\"blinky\"",
+    "APP_blinky": "1",
+    "ARCH_NAME": "\"cortex_m4\"",
+    "ARCH_cortex_m4": "1",
+    "BASELIBC_ASSERT_FILE_LINE": "0",
+    "BASELIBC_PRESENT": "1",
+    "BSP_NAME": "\"nordic_pca10040\"",
+    "BSP_NRF52": "1",
+    "BSP_nordic_pca10040": "1",
+    "CONSOLE_UART_BAUD": "115200",
+    "CONSOLE_UART_DEV": "\"uart0\"",
+    "CONSOLE_UART_FLOW_CONTROL": "UART_FLOW_CTL_NONE",
+    "CRYPTO": "0",
+    "DEBUG_PANIC_ENABLED": "1",
+    "ENC_FLASH_DEV": "0",
+    "FLASH_MAP_MAX_AREAS": "10",
+    "FLASH_MAP_SYSINIT_STAGE": "2",
+    "FLOAT_USER": "0",
+    "GPIO_AS_PIN_RESET": "0",
+    "HAL_FLASH_VERIFY_BUF_SZ": "16",
+    "HAL_FLASH_VERIFY_ERASES": "0",
+    "HAL_FLASH_VERIFY_WRITES": "0",
+    "HAL_SYSTEM_RESET_CB": "0",
+    "HARDFLOAT": "0",
+    "I2C_0": "0",
+    "I2C_0_FREQ_KHZ": "100",
+    "I2C_0_PIN_SCL": "27",
+    "I2C_0_PIN_SDA": "26",
+    "I2C_1": "0",
+    "I2C_1_FREQ_KHZ": "100",
+    "I2C_1_PIN_SCL": "",
+    "I2C_1_PIN_SDA": "",
+    "LOG_CONSOLE": "1",
+    "LOG_FCB": "0",
+    "LOG_FCB_SLOT1": "0",
+    "LOG_LEVEL": "255",
+    "MCU_BUS_DRIVER_I2C_USE_TWIM": "0",
+    "MCU_DCDC_ENABLED": "1",
+    "MCU_DEBUG_IGNORE_BKPT": "0",
+    "MCU_FLASH_MIN_WRITE_SIZE": "1",
+    "MCU_GPIO_USE_PORT_EVENT": "0",
+    "MCU_I2C_RECOVERY_DELAY_USEC": "100",
+    "MCU_LFCLK_SOURCE": "LFXO",
+    "MCU_NRF52832": "0",
+    "MCU_NRF52840": "0",
+    "MCU_TARGET": "nRF52832",
+    "MFG_LOG_MODULE": "128",
+    "MFG_MAX_MMRS": "2",
+    "MFG_SYSINIT_STAGE": "100",
+    "MODLOG_CONSOLE_DFLT": "1",
+    "MODLOG_LOG_MACROS": "0",
+    "MODLOG_MAX_MAPPINGS": "16",
+    "MODLOG_MAX_PRINTF_LEN": "128",
+    "MODLOG_SYSINIT_STAGE": "100",
+    "MSYS_1_BLOCK_COUNT": "12",
+    "MSYS_1_BLOCK_SIZE": "292",
+    "MSYS_1_SANITY_MIN_COUNT": "0",
+    "MSYS_2_BLOCK_COUNT": "0",
+    "MSYS_2_BLOCK_SIZE": "0",
+    "MSYS_2_SANITY_MIN_COUNT": "0",
+    "MSYS_SANITY_TIMEOUT": "60000",
+    "NEWT_FEATURE_LOGCFG": "1",
+    "NEWT_FEATURE_SYSDOWN": "1",
+    "NFC_PINS_AS_GPIO": "1",
+    "OS_ASSERT_CB": "0",
+    "OS_CLI": "0",
+    "OS_COREDUMP": "0",
+    "OS_CPUTIME_FREQ": "1000000",
+    "OS_CPUTIME_TIMER_NUM": "0",
+    "OS_CRASH_FILE_LINE": "0",
+    "OS_CRASH_LOG": "0",
+    "OS_CRASH_RESTORE_REGS": "0",
+    "OS_CRASH_STACKTRACE": "0",
+    "OS_CTX_SW_STACK_CHECK": "0",
+    "OS_CTX_SW_STACK_GUARD": "4",
+    "OS_DEBUG_MODE": "0",
+    "OS_EVENTQ_DEBUG": "0",
+    "OS_EVENTQ_MONITOR": "0",
+    "OS_IDLE_TICKLESS_MS_MAX": "600000",
+    "OS_IDLE_TICKLESS_MS_MIN": "100",
+    "OS_MAIN_STACK_SIZE": "1024",
+    "OS_MAIN_TASK_PRIO": "127",
+    "OS_MAIN_TASK_SANITY_ITVL_MS": "0",
+    "OS_MEMPOOL_CHECK": "0",
+    "OS_MEMPOOL_GUARD": "0",
+    "OS_MEMPOOL_POISON": "0",
+    "OS_SCHEDULING": "1",
+    "OS_SYSINIT_STAGE": "0",
+    "OS_SYSVIEW": "0",
+    "OS_SYSVIEW_TRACE_CALLOUT": "1",
+    "OS_SYSVIEW_TRACE_EVENTQ": "1",
+    "OS_SYSVIEW_TRACE_MBUF": "0",
+    "OS_SYSVIEW_TRACE_MEMPOOL": "0",
+    "OS_SYSVIEW_TRACE_MUTEX": "1",
+    "OS_SYSVIEW_TRACE_SEM": "1",
+    "OS_TIME_DEBUG": "0",
+    "OS_WATCHDOG_MONITOR": "0",
+    "PWM_0": "0",
+    "PWM_1": "0",
+    "PWM_2": "0",
+    "PWM_3": "0",
+    "QSPI_ADDRMODE": "0",
+    "QSPI_DPMCONFIG": "0",
+    "QSPI_ENABLE": "0",
+    "QSPI_FLASH_PAGE_SIZE": "0",
+    "QSPI_FLASH_SECTOR_COUNT": "-1",
+    "QSPI_FLASH_SECTOR_SIZE": "0",
+    "QSPI_PIN_CS": "-1",
+    "QSPI_PIN_DIO0": "-1",
+    "QSPI_PIN_DIO1": "-1",
+    "QSPI_PIN_DIO2": "-1",
+    "QSPI_PIN_DIO3": "-1",
+    "QSPI_PIN_SCK": "-1",
+    "QSPI_READOC": "0",
+    "QSPI_SCK_DELAY": "0",
+    "QSPI_SCK_FREQ": "0",
+    "QSPI_SPI_MODE": "0",
+    "QSPI_WRITEOC": "0",
+    "RAM_RESIDENT": "0",
+    "RWLOCK_DEBUG": "0",
+    "SANITY_INTERVAL": "15000",
+    "SOFT_PWM": "0",
+    "SPI_0_MASTER": "0",
+    "SPI_0_MASTER_PIN_MISO": "25",
+    "SPI_0_MASTER_PIN_MOSI": "24",
+    "SPI_0_MASTER_PIN_SCK": "23",
+    "SPI_0_SLAVE": "0",
+    "SPI_0_SLAVE_PIN_MISO": "25",
+    "SPI_0_SLAVE_PIN_MOSI": "24",
+    "SPI_0_SLAVE_PIN_SCK": "23",
+    "SPI_0_SLAVE_PIN_SS": "22",
+    "SPI_1_MASTER": "0",
+    "SPI_1_MASTER_PIN_MISO": "",
+    "SPI_1_MASTER_PIN_MOSI": "",
+    "SPI_1_MASTER_PIN_SCK": "",
+    "SPI_1_SLAVE": "0",
+    "SPI_1_SLAVE_PIN_MISO": "",
+    "SPI_1_SLAVE_PIN_MOSI": "",
+    "SPI_1_SLAVE_PIN_SCK": "",
+    "SPI_1_SLAVE_PIN_SS": "",
+    "SPI_2_MASTER": "0",
+    "SPI_2_MASTER_PIN_MISO": "",
+    "SPI_2_MASTER_PIN_MOSI": "",
+    "SPI_2_MASTER_PIN_SCK": "",
+    "SPI_2_SLAVE": "0",
+    "SPI_2_SLAVE_PIN_MISO": "",
+    "SPI_2_SLAVE_PIN_MOSI": "",
+    "SPI_2_SLAVE_PIN_SCK": "",
+    "SPI_2_SLAVE_PIN_SS": "",
+    "SPI_3_MASTER": "0",
+    "SPI_3_MASTER_PIN_MISO": "",
+    "SPI_3_MASTER_PIN_MOSI": "",
+    "SPI_3_MASTER_PIN_SCK": "",
+    "SPI_3_SLAVE": "0",
+    "SPI_3_SLAVE_PIN_MISO": "",
+    "SPI_3_SLAVE_PIN_MOSI": "",
+    "SPI_3_SLAVE_PIN_SCK": "",
+    "SPI_3_SLAVE_PIN_SS": "",
+    "SYSDOWN_CONSTRAIN_DOWN": "1",
+    "SYSDOWN_PANIC_FILE_LINE": "0",
+    "SYSDOWN_PANIC_MESSAGE": "0",
+    "SYSDOWN_TIMEOUT_MS": "10000",
+    "SYSINIT_CONSTRAIN_INIT": "1",
+    "SYSINIT_PANIC_FILE_LINE": "0",
+    "SYSINIT_PANIC_MESSAGE": "0",
+    "TARGET_NAME": "\"blinky-nordic_pca10040\"",
+    "TARGET_blinky_nordic_pca10040": "1",
+    "TIMER_0": "1",
+    "TIMER_1": "0",
+    "TIMER_2": "0",
+    "TIMER_3": "0",
+    "TIMER_4": "0",
+    "TIMER_5": "0",
+    "TRNG": "0",
+    "UARTBB_0": "0",
+    "UARTBB_0_PIN_RX": "-1",
+    "UARTBB_0_PIN_TX": "-1",
+    "UART_0": "1",
+    "UART_0_PIN_CTS": "7",
+    "UART_0_PIN_RTS": "5",
+    "UART_0_PIN_RX": "8",
+    "UART_0_PIN_TX": "6",
+    "UART_1": "0",
+    "UART_1_PIN_CTS": "-1",
+    "UART_1_PIN_RTS": "-1",
+    "UART_1_PIN_RX": "",
+    "UART_1_PIN_TX": "",
+    "WATCHDOG_INTERVAL": "30000",
+    "XTAL_32768": "0",
+    "XTAL_32768_SYNTH": "0",
+    "XTAL_RC": "0"
+  },
+  "pkgsz": [
+    {
+      "name": "*fill*",
+      "files": [
+        {
+          "name": "",
+          "sym": [
+            {
+              "name": "*fill*",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 63
+                }
+              ]
+            },
+            {
+              "name": "*fill*",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 233
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "apps/blinky",
+      "files": [
+        {
+          "name": "main.o",
+          "sym": [
+            {
+              "name": "COMMON",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "g_task1_loops",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "startup",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 56
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/hw/bsp/nordic_pca10040",
+      "files": [
+        {
+          "name": "sbrk.o",
+          "sym": [
+            {
+              "name": ".data",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "_sbrkInit",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gcc_startup_nrf52.o",
+          "sym": [
+            {
+              "name": ".isr_vector",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 216
+                }
+              ]
+            },
+            {
+              "name": ".stack",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 432
+                }
+              ]
+            },
+            {
+              "name": ".text",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 112
+                }
+              ]
+            },
+            {
+              "name": "exidx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_bsp.o",
+          "sym": [
+            {
+              "name": "hal_bsp_flash_dev",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "hal_bsp_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 14
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/hw/cmsis-core",
+      "files": [
+        {
+          "name": "cmsis_nvic.o",
+          "sym": [
+            {
+              "name": "NVIC_Relocate",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 40
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/hw/drivers/uart/uart_hal",
+      "files": [
+        {
+          "name": "uart_hal.o",
+          "sym": [
+            {
+              "name": "uart_hal_blocking_tx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_close",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 104
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_open",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 114
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_resume",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 44
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_start_rx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_start_tx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "uart_hal_suspend",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 40
+                }
+              ]
+            },
+            {
+              "name": "unlikely",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 14
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/hw/hal",
+      "files": [
+        {
+          "name": "hal_flash.o",
+          "sym": [
+            {
+              "name": "hal_flash_check_addr",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 28
+                }
+              ]
+            },
+            {
+              "name": "hal_flash_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "hal_flash_read",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 68
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/hw/mcu/nordic/nrf52xxx",
+      "files": [
+        {
+          "name": "hal_os_tick.o",
+          "sym": [
+            {
+              "name": "COMMON",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 40
+                }
+              ]
+            },
+            {
+              "name": "nrf52_os_tick_set_ocmp",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 64
+                }
+              ]
+            },
+            {
+              "name": "nrf52_timer_handler",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 80
+                }
+              ]
+            },
+            {
+              "name": "os_tick_idle",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 68
+                }
+              ]
+            },
+            {
+              "name": "os_tick_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 148
+                }
+              ]
+            },
+            {
+              "name": "sub24",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 46
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "system_nrf52.o",
+          "sym": [
+            {
+              "name": "SystemCoreClock",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "SystemInit",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 480
+                }
+              ]
+            },
+            {
+              "name": "errata_16",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 52
+                }
+              ]
+            },
+            {
+              "name": "errata_31",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 64
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_timer.o",
+          "sym": [
+            {
+              "name": "__NVIC_SetPendingIRQ",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 32
+                }
+              ]
+            },
+            {
+              "name": "hal_timer_config",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 212
+                }
+              ]
+            },
+            {
+              "name": "hal_timer_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 88
+                }
+              ]
+            },
+            {
+              "name": "hal_timer_read_bsptimer",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 56
+                }
+              ]
+            },
+            {
+              "name": "nrf52_hal_timers",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 24
+                }
+              ]
+            },
+            {
+              "name": "nrf52_timer0_irq_handler",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 168
+                }
+              ]
+            },
+            {
+              "name": "nrf_timer_set_ocmp",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 126
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_system.o",
+          "sym": [
+            {
+              "name": "hal_debugger_connected",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "hal_system_clock_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 60
+                }
+              ]
+            },
+            {
+              "name": "hal_system_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "hal_system_reset",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 48
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_gpio.o",
+          "sym": [
+            {
+              "name": "hal_gpio_init_out",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 38
+                }
+              ]
+            },
+            {
+              "name": "hal_gpio_read",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 34
+                }
+              ]
+            },
+            {
+              "name": "hal_gpio_toggle",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 26
+                }
+              ]
+            },
+            {
+              "name": "hal_gpio_write",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 24
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_uart.o",
+          "sym": [
+            {
+              "name": "hal_uart_blocking_tx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 80
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_close",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 52
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_config",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 408
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 64
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_init_cbs",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_start_rx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 56
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_start_tx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 72
+                }
+              ]
+            },
+            {
+              "name": "hal_uart_tx_fill_buf",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "uart0",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 28
+                }
+              ]
+            },
+            {
+              "name": "uart0_irq_handler",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 128
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_watchdog.o",
+          "sym": [
+            {
+              "name": "hal_watchdog_enable",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "hal_watchdog_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 112
+                }
+              ]
+            },
+            {
+              "name": "hal_watchdog_tickle",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "nrf52_wdt_irq_handler",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "nrf52_periph.o",
+          "sym": [
+            {
+              "name": "nrf52_periph_create",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 90
+                }
+              ]
+            },
+            {
+              "name": "os_bsp_uart0",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 60
+                }
+              ]
+            },
+            {
+              "name": "os_bsp_uart0_cfg",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "hal_flash.o",
+          "sym": [
+            {
+              "name": "nrf52k_flash_dev",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 24
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_erase_sector",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 76
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_funcs",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 28
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_read",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 14
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_sector_info",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 32
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_wait_ready",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "nrf52k_flash_write",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 200
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/kernel/os",
+      "files": [
+        {
+          "name": "HAL_CM4.o",
+          "sym": [
+            {
+              "name": ".text",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 200
+                }
+              ]
+            },
+            {
+              "name": "exidx",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os.o",
+          "sym": [
+            {
+              "name": "COMMON",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 217
+                }
+              ]
+            },
+            {
+              "name": "g_idle_task_stack",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 256
+                }
+              ]
+            },
+            {
+              "name": "g_os_main_stack",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4096
+                }
+              ]
+            },
+            {
+              "name": "os_idle_task",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 124
+                }
+              ]
+            },
+            {
+              "name": "os_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 149
+                }
+              ]
+            },
+            {
+              "name": "os_init_idle_task",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 93
+                }
+              ]
+            },
+            {
+              "name": "os_main",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 22
+                }
+              ]
+            },
+            {
+              "name": "os_pkg_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 48
+                }
+              ]
+            },
+            {
+              "name": "os_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 26
+                }
+              ]
+            },
+            {
+              "name": "os_started",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_fault.o",
+          "sym": [
+            {
+              "name": "__assert_func",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "os_default_irq",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 24
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_time.o",
+          "sym": [
+            {
+              "name": "basetod",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 48
+                }
+              ]
+            },
+            {
+              "name": "os_deltatime",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 76
+                }
+              ]
+            },
+            {
+              "name": "os_time_advance",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 120
+                }
+              ]
+            },
+            {
+              "name": "os_time_delay",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 40
+                }
+              ]
+            },
+            {
+              "name": "os_time_get",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_msys.o",
+          "sym": [
+            {
+              "name": "g_msys_pool_list",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "os_msys_1_data",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 3504
+                }
+              ]
+            },
+            {
+              "name": "os_msys_1_mbuf_pool",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "os_msys_1_mempool",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 28
+                }
+              ]
+            },
+            {
+              "name": "os_msys_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 103
+                }
+              ]
+            },
+            {
+              "name": "os_msys_register",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 64
+                }
+              ]
+            },
+            {
+              "name": "os_msys_reset",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_dev.o",
+          "sym": [
+            {
+              "name": "g_os_dev_list",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "os_dev_create",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 136
+                }
+              ]
+            },
+            {
+              "name": "os_dev_initialize",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 32
+                }
+              ]
+            },
+            {
+              "name": "os_dev_initialize_all",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 40
+                }
+              ]
+            },
+            {
+              "name": "os_dev_reset",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_sched.o",
+          "sym": [
+            {
+              "name": "g_os_run_list",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "g_os_sleep_list",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "os_sched",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "os_sched_ctx_sw_hook",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 44
+                }
+              ]
+            },
+            {
+              "name": "os_sched_get_current_task",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "os_sched_insert",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 76
+                }
+              ]
+            },
+            {
+              "name": "os_sched_next_task",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "os_sched_os_timer_exp",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 60
+                }
+              ]
+            },
+            {
+              "name": "os_sched_resort",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "os_sched_set_current_task",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "os_sched_sleep",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 116
+                }
+              ]
+            },
+            {
+              "name": "os_sched_wakeup",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 104
+                }
+              ]
+            },
+            {
+              "name": "os_sched_wakeup_ticks",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 52
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_sanity.o",
+          "sym": [
+            {
+              "name": "g_os_sanity_check_list",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_check_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 14
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_check_list_lock",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 28
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_check_list_unlock",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 24
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_check_register",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 32
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "os_sanity_run",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 80
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_arch_arm.o",
+          "sym": [
+            {
+              "name": "os_arch_ctx_sw",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "os_arch_in_critical",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 10
+                }
+              ]
+            },
+            {
+              "name": "os_arch_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "os_arch_os_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 148
+                }
+              ]
+            },
+            {
+              "name": "os_arch_os_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 84
+                }
+              ]
+            },
+            {
+              "name": "os_arch_restore_sr",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 6
+                }
+              ]
+            },
+            {
+              "name": "os_arch_save_sr",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "os_arch_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 48
+                }
+              ]
+            },
+            {
+              "name": "os_arch_task_stack_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 54
+                }
+              ]
+            },
+            {
+              "name": "os_flags",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "timer_handler",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_callout.o",
+          "sym": [
+            {
+              "name": "os_callout_tick",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 84
+                }
+              ]
+            },
+            {
+              "name": "os_callout_wakeup_ticks",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 48
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_cputime.o",
+          "sym": [
+            {
+              "name": "os_cputime_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_eventq.o",
+          "sym": [
+            {
+              "name": "os_eventq_dflt_get",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "os_eventq_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "os_eventq_main",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "os_eventq_put",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 104
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_mbuf.o",
+          "sym": [
+            {
+              "name": "os_mbuf_pool_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 10
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_mempool.o",
+          "sym": [
+            {
+              "name": "os_mempool_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 18
+                }
+              ]
+            },
+            {
+              "name": "os_mempool_init_internal",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 104
+                }
+              ]
+            },
+            {
+              "name": "os_mempool_module_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_mutex.o",
+          "sym": [
+            {
+              "name": "os_mutex_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            },
+            {
+              "name": "os_mutex_pend",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 220
+                }
+              ]
+            },
+            {
+              "name": "os_mutex_release",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 160
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "os_task.o",
+          "sym": [
+            {
+              "name": "os_task_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 228
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/libc/baselibc",
+      "files": [
+        {
+          "name": "start.o",
+          "sym": [
+            {
+              "name": "_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 2
+                }
+              ]
+            },
+            {
+              "name": "_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 20
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "memcpy.o",
+          "sym": [
+            {
+              "name": "memcpy",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 26
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "memset.o",
+          "sym": [
+            {
+              "name": "memset",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "strlen.o",
+          "sym": [
+            {
+              "name": "strlen",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/sys/flash_map",
+      "files": [
+        {
+          "name": "flash_map.o",
+          "sym": [
+            {
+              "name": "COMMON",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 8
+                }
+              ]
+            },
+            {
+              "name": "flash_area_open",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 60
+                }
+              ]
+            },
+            {
+              "name": "flash_area_read",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 36
+                }
+              ]
+            },
+            {
+              "name": "flash_map_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 172
+                }
+              ]
+            },
+            {
+              "name": "mfg_areas",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 120
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/sys/log/modlog",
+      "files": [
+        {
+          "name": "modlog.o",
+          "sym": [
+            {
+              "name": "modlog_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 2
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/sys/mfg",
+      "files": [
+        {
+          "name": "mfg.o",
+          "sym": [
+            {
+              "name": "mfg_init",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 92
+                }
+              ]
+            },
+            {
+              "name": "mfg_initialized",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 1
+                }
+              ]
+            },
+            {
+              "name": "mfg_mmrs",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 24
+                }
+              ]
+            },
+            {
+              "name": "mfg_num_mmrs",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "mfg_open",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 16
+                }
+              ]
+            },
+            {
+              "name": "mfg_read_next_mmr",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 164
+                }
+              ]
+            },
+            {
+              "name": "mfg_read_tlv_body",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 100
+                }
+              ]
+            },
+            {
+              "name": "mfg_read_tlv_flash_area",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 6
+                }
+              ]
+            },
+            {
+              "name": "mfg_read_tlv_mmr_ref",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 6
+                }
+              ]
+            },
+            {
+              "name": "mfg_seek_next",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 128
+                }
+              ]
+            },
+            {
+              "name": "mfg_seek_next_with_type",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 22
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/sys/sysinit",
+      "files": [
+        {
+          "name": "sysinit.o",
+          "sym": [
+            {
+              "name": "COMMON",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 1
+                }
+              ]
+            },
+            {
+              "name": "sysinit_dflt_panic_cb",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 6
+                }
+              ]
+            },
+            {
+              "name": "sysinit_end",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            },
+            {
+              "name": "sysinit_panic_cb",
+              "areas": [
+                {
+                  "name": "RAM",
+                  "size": 4
+                }
+              ]
+            },
+            {
+              "name": "sysinit_start",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 12
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "@apache-mynewt-core/util/mem",
+      "files": [
+        {
+          "name": "mem.o",
+          "sym": [
+            {
+              "name": "mem_init_mbuf_pool",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 50
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "blinky-nordic_pca10040-sysinit-app",
+      "files": [
+        {
+          "name": "blinky-nordic_pca10040-sysflash.o",
+          "sym": [
+            {
+              "name": "sysflash_map_dflt",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 72
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "blinky-nordic_pca10040-sysinit-app.o",
+          "sym": [
+            {
+              "name": "sysinit_app",
+              "areas": [
+                {
+                  "name": "FLASH",
+                  "size": 22
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

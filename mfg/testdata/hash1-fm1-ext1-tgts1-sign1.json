@@ -1,0 +1,91 @@
+{
+  "name": "mfgs/boot-blinky-nordic_pca10040",
+  "build_time": "2019-06-18T11:40:06-07:00",
+  "format": 2,
+  "mfg_hash": "aaf06a2d96aeaea196118dac3c1c1be86d386c4ca219cb7a69531444219f7139",
+  "version": "1.0.0.0",
+  "device": 0,
+  "bin_path": "mfgimg.bin",
+  "hex_path": "mfgimg.hex",
+  "bsp": "@apache-mynewt-core/hw/bsp/nordic_pca10040",
+  "erase_val": 255,
+  "signatures": [
+    {
+      "key": "b02c7387",
+      "sig": "1b7900658aa75d7d037112de85889812308b90b7f7ce259c58ecb779c4582de4f80b4acf80489e161b45935169f684bc12b2c488ea9d96003e9e02d92ff0f22b5e724f7342f63de7f1ae185c846c779f0c3a6f5fa6ccb057871571bbdc4d5290295e08fd8e2db67560ddc837881b363c92745c882fe21a529b4ec5e0d85c176cf43c1402403d3ec1679fbbd01405382458b5f704700c398b7bba6bcf9e8249ff833387f234884ae80f4543ceb9b0949579a68cf4d7b0949b8853e345a02453a38f10be0bfca8061b25cae22f15ecac19fa74313ac782d3b17d8af54c85dc4201204f01780fea09327901aa4f1f11b83c1b9aba37bb8e4b271c9de0238069fece"
+    }
+  ],
+  "flash_map": [
+    {
+      "name": "FLASH_AREA_BOOTLOADER",
+      "id": 0,
+      "device": 0,
+      "offset": 0,
+      "size": 16384
+    },
+    {
+      "name": "FLASH_AREA_IMAGE_0",
+      "id": 1,
+      "device": 0,
+      "offset": 32768,
+      "size": 237568
+    },
+    {
+      "name": "FLASH_AREA_IMAGE_1",
+      "id": 2,
+      "device": 0,
+      "offset": 270336,
+      "size": 237568
+    },
+    {
+      "name": "FLASH_AREA_IMAGE_SCRATCH",
+      "id": 3,
+      "device": 0,
+      "offset": 507904,
+      "size": 4096
+    },
+    {
+      "name": "FLASH_AREA_REBOOT_LOG",
+      "id": 16,
+      "device": 0,
+      "offset": 16384,
+      "size": 16384
+    },
+    {
+      "name": "FLASH_AREA_NFFS",
+      "id": 17,
+      "device": 0,
+      "offset": 512000,
+      "size": 12288
+    }
+  ],
+  "targets": [
+    {
+      "name": "targets/boot-nordic_pca10040",
+      "offset": 0,
+      "bin_path": "targets/0/binary.bin",
+      "hex_path": "targets/0/image.hex",
+      "manifest_path": "targets/0/manifest.json"
+    },
+    {
+      "name": "targets/blinky-nordic_pca10040",
+      "offset": 32768,
+      "image_path": "targets/1/image.img",
+      "hex_path": "targets/1/image.hex",
+      "manifest_path": "targets/1/manifest.json"
+    }
+  ],
+  "meta": {
+    "end_offset": 16384,
+    "size": 117,
+    "hash_present": true,
+    "flash_map_present": true,
+    "mmrs": [
+      {
+        "area": "FLASH_AREA_REBOOT_LOG",
+        "_device": 0,
+        "_end_offset": 32768
+      }
+    ]
+  }
+}

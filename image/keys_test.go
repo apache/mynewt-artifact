@@ -24,8 +24,8 @@ import (
 	"os"
 	"testing"
 
-	"mynewt.apache.org/artifact/image"
-	"mynewt.apache.org/artifact/sec"
+	"github.com/apache/mynewt-artifact/image"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 func TestRSA(t *testing.T) {
