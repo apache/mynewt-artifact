@@ -23,8 +23,9 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"strings"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 /*
@@ -86,13 +87,12 @@ func ReadManifest(path string) (Manifest, error) {
 
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		return m, util.ChildNewtError(err)
+		return m, errors.Wrapf(err, "failed to read manifest file")
 	}
 
 	if err := json.Unmarshal(content, &m); err != nil {
-		return m, util.FmtNewtError(
-			"Failure decoding manifest with path \"%s\": %s",
-			path, err.Error())
+		return m, errors.Wrapf(
+			err, "failure decoding manifest with path \"%s\"", path)
 	}
 
 	return m, nil
@@ -101,13 +101,24 @@ func ReadManifest(path string) (Manifest, error) {
 func (m *Manifest) Write(w io.Writer) (int, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return 0, util.FmtNewtError("Cannot encode manifest: %s", err.Error())
+		return 0, errors.Wrapf(err, "Cannot encode manifest")
 	}
 
 	cnt, err := w.Write(buffer)
 	if err != nil {
-		return 0, util.FmtNewtError("Cannot write manifest: %s", err.Error())
+		return 0, errors.Wrapf(err, "Cannot write manifest")
 	}
 
 	return cnt, nil
+}
+
+func (m *Manifest) FindTargetVar(key string) string {
+	for _, tv := range m.TgtVars {
+		parts := strings.SplitN(tv, "=", 2)
+		if len(parts) == 2 && parts[0] == key {
+			return parts[1]
+		}
+	}
+
+	return ""
 }

@@ -20,11 +20,13 @@
 package manifest
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 
-	"mynewt.apache.org/newt/artifact/flash"
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/flash"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 type MfgManifestTarget struct {
@@ -48,7 +50,6 @@ type MfgManifestMeta struct {
 	Hash      bool                 `json:"hash_present"`
 	FlashMap  bool                 `json:"flash_map_present"`
 	Mmrs      []MfgManifestMetaMmr `json:"mmrs,omitempty"`
-	// XXX: refhash
 }
 
 type MfgManifestSig struct {
@@ -66,6 +67,7 @@ type MfgManifest struct {
 	BinPath    string            `json:"bin_path"`
 	HexPath    string            `json:"hex_path"`
 	Bsp        string            `json:"bsp"`
+	EraseVal   byte              `json:"erase_val"`
 	Signatures []MfgManifestSig  `json:"signatures,omitempty"`
 	FlashAreas []flash.FlashArea `json:"flash_map"`
 
@@ -73,18 +75,29 @@ type MfgManifest struct {
 	Meta    *MfgManifestMeta    `json:"meta,omitempty"`
 }
 
-func ReadMfgManifest(path string) (MfgManifest, error) {
-	m := MfgManifest{}
-
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		return m, util.ChildNewtError(err)
+func ParseMfgManifest(jsonText []byte) (MfgManifest, error) {
+	m := MfgManifest{
+		// Backwards compatibility: assume 0xff if unspecified.
+		EraseVal: 0xff,
 	}
 
-	if err := json.Unmarshal(content, &m); err != nil {
-		return m, util.FmtNewtError(
-			"Failure decoding mfg manifest with path \"%s\": %s",
-			path, err.Error())
+	if err := json.Unmarshal(jsonText, &m); err != nil {
+		return m, errors.Wrapf(err, "failure decoding mfg manifest")
+	}
+
+	return m, nil
+}
+
+func ReadMfgManifest(path string) (MfgManifest, error) {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return MfgManifest{}, errors.Wrapf(err,
+			"failed to read mfg manifest file")
+	}
+
+	m, err := ParseMfgManifest(content)
+	if err != nil {
+		return m, errors.Wrapf(err, "path=%s", path)
 	}
 
 	return m, nil
@@ -93,9 +106,67 @@ func ReadMfgManifest(path string) (MfgManifest, error) {
 func (m *MfgManifest) MarshalJson() ([]byte, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Cannot encode mfg manifest: %s", err.Error())
+		return nil, errors.Wrapf(err, "cannot encode mfg manifest")
 	}
 
 	return buffer, nil
+}
+
+func (m *MfgManifest) FindFlashArea(device int, offset int) *flash.FlashArea {
+	for i, _ := range m.FlashAreas {
+		fa := &m.FlashAreas[i]
+		if fa.Device == device && fa.Offset == offset {
+			return fa
+		}
+	}
+
+	return nil
+}
+
+func (m *MfgManifest) FindFlashAreaName(name string) *flash.FlashArea {
+	for i, _ := range m.FlashAreas {
+		fa := &m.FlashAreas[i]
+		if fa.Name == name {
+			return fa
+		}
+	}
+
+	return nil
+}
+
+func (ms *MfgManifestSig) SecSig() (sec.Sig, error) {
+	keyHash, err := hex.DecodeString(ms.Key)
+	if err != nil {
+		return sec.Sig{}, errors.Errorf(
+			"invalid hex-encoded key hash: %s", ms.Key)
+	}
+
+	data, err := hex.DecodeString(ms.Sig)
+	if err != nil {
+		return sec.Sig{}, errors.Errorf(
+			"invalid hex-encoded signature: %s", ms.Sig)
+	}
+
+	return sec.Sig{
+		KeyHash: keyHash,
+		Data:    data,
+	}, nil
+}
+
+func (m *MfgManifest) SecSigs() ([]sec.Sig, error) {
+	var sigs []sec.Sig
+	for _, ms := range m.Signatures {
+		s, err := ms.SecSig()
+		if err != nil {
+			return nil, err
+		}
+
+		sigs = append(sigs, s)
+	}
+
+	return sigs, nil
+}
+
+func (mt *MfgManifestTarget) IsBoot() bool {
+	return mt.BinPath != ""
 }

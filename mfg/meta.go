@@ -25,7 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 // The "manufacturing meta region" is located at the end of the boot loader
@@ -139,7 +139,7 @@ func MetaTlvTypeName(typ uint8) string {
 func writeElem(elem interface{}, w io.Writer) error {
 	/* XXX: Assume target platform uses little endian. */
 	if err := binary.Write(w, binary.LittleEndian, elem); err != nil {
-		return util.ChildNewtError(err)
+		return errors.Wrapf(err, "failed to write MMR element")
 	}
 	return nil
 }
@@ -158,6 +158,43 @@ func (tlv *MetaTlv) Write(w io.Writer) (int, error) {
 	sz += len(tlv.Data)
 
 	return sz, nil
+}
+
+func (tlv *MetaTlv) StructuredBody() (interface{}, error) {
+	r := bytes.NewReader(tlv.Data)
+
+	readBody := func(dst interface{}) error {
+		if err := binary.Read(r, binary.LittleEndian, dst); err != nil {
+			return errors.Wrapf(err, "error parsing TLV data")
+		}
+		return nil
+	}
+
+	switch tlv.Header.Type {
+	case META_TLV_TYPE_HASH:
+		var body MetaTlvBodyHash
+		if err := readBody(&body); err != nil {
+			return nil, err
+		}
+		return &body, nil
+
+	case META_TLV_TYPE_FLASH_AREA:
+		var body MetaTlvBodyFlashArea
+		if err := readBody(&body); err != nil {
+			return nil, err
+		}
+		return &body, nil
+
+	case META_TLV_TYPE_MMR_REF:
+		var body MetaTlvBodyMmrRef
+		if err := readBody(&body); err != nil {
+			return nil, err
+		}
+		return &body, nil
+
+	default:
+		return nil, errors.Errorf("unknown meta TLV type: %d", tlv.Header.Type)
+	}
 }
 
 func (meta *Meta) WritePlusOffsets(w io.Writer) (MetaOffsets, error) {
@@ -270,25 +307,41 @@ func (meta *Meta) Hash() []byte {
 	return tlv.Data
 }
 
+func (meta *Meta) Clone() Meta {
+	var tlvs []MetaTlv
+	for _, src := range meta.Tlvs {
+		dst := MetaTlv{
+			Header: src.Header,
+			Data:   make([]byte, len(src.Data)),
+		}
+		copy(dst.Data, src.Data)
+		tlvs = append(tlvs, dst)
+	}
+
+	return Meta{
+		Tlvs:   tlvs,
+		Footer: meta.Footer,
+	}
+}
+
 func parseMetaTlv(bin []byte) (MetaTlv, int, error) {
 	r := bytes.NewReader(bin)
 
 	tlv := MetaTlv{}
 	if err := binary.Read(r, binary.LittleEndian, &tlv.Header); err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Error reading TLV header: %s", err.Error())
+		return tlv, 0, errors.Wrapf(err, "error reading TLV header")
 	}
 
 	data := make([]byte, tlv.Header.Size)
 	sz, err := r.Read(data)
 	if err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Error reading %d bytes of TLV data: %s",
-			tlv.Header.Size, err.Error())
+		return tlv, 0, errors.Wrapf(err,
+			"error reading %d bytes of TLV data",
+			tlv.Header.Size)
 	}
 	if sz != len(data) {
-		return tlv, 0, util.FmtNewtError(
-			"Error reading %d bytes of TLV data: incomplete read",
+		return tlv, 0, errors.Errorf(
+			"error reading %d bytes of TLV data: incomplete read",
 			tlv.Header.Size)
 	}
 	tlv.Data = data
@@ -301,13 +354,13 @@ func parseMetaFooter(bin []byte) (MetaFooter, int, error) {
 
 	var ftr MetaFooter
 	if err := binary.Read(r, binary.LittleEndian, &ftr); err != nil {
-		return ftr, 0, util.FmtNewtError(
-			"Error reading meta footer: %s", err.Error())
+		return ftr, 0, errors.Wrapf(err,
+			"error reading meta footer")
 	}
 
 	if ftr.Magic != META_MAGIC {
-		return ftr, 0, util.FmtNewtError(
-			"Meta footer contains invalid magic; exp:0x%08x, got:0x%08x",
+		return ftr, 0, errors.Errorf(
+			"meta footer contains invalid magic; exp:0x%08x, got:0x%08x",
 			META_MAGIC, ftr.Magic)
 	}
 
@@ -316,8 +369,8 @@ func parseMetaFooter(bin []byte) (MetaFooter, int, error) {
 
 func ParseMeta(bin []byte) (Meta, int, error) {
 	if len(bin) < META_FOOTER_SZ {
-		return Meta{}, 0, util.FmtNewtError(
-			"Binary too small to accommodate meta footer; "+
+		return Meta{}, 0, errors.Errorf(
+			"binary too small to accommodate meta footer; "+
 				"bin-size=%d ftr-size=%d", len(bin), META_FOOTER_SZ)
 	}
 
@@ -327,8 +380,8 @@ func ParseMeta(bin []byte) (Meta, int, error) {
 	}
 
 	if int(ftr.Size) > len(bin) {
-		return Meta{}, 0, util.FmtNewtError(
-			"Binary too small to accommodate meta region; "+
+		return Meta{}, 0, errors.Errorf(
+			"binary too small to accommodate meta region; "+
 				"bin-size=%d meta-size=%d", len(bin), ftr.Size)
 	}
 

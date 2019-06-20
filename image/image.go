@@ -31,7 +31,8 @@ import (
 	"strconv"
 	"strings"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 const (
@@ -128,6 +129,11 @@ type ImageOffsets struct {
 	TotalSize int
 }
 
+func ImageTlvTypeIsValid(tlvType uint8) bool {
+	_, ok := imageTlvTypeNameMap[tlvType]
+	return ok
+}
+
 func ImageTlvTypeName(tlvType uint8) string {
 	name, ok := imageTlvTypeNameMap[tlvType]
 	if !ok {
@@ -155,24 +161,24 @@ func ParseVersion(versStr string) (ImageVersion, error) {
 	components := strings.Split(versStr, ".")
 	major, err = strconv.ParseUint(components[0], 10, 8)
 	if err != nil {
-		return ver, util.FmtNewtError("Invalid version string %s", versStr)
+		return ver, errors.Errorf("invalid version string %s", versStr)
 	}
 	if len(components) > 1 {
 		minor, err = strconv.ParseUint(components[1], 10, 8)
 		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
+			return ver, errors.Errorf("invalid version string %s", versStr)
 		}
 	}
 	if len(components) > 2 {
 		rev, err = strconv.ParseUint(components[2], 10, 16)
 		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
+			return ver, errors.Errorf("invalid version string %s", versStr)
 		}
 	}
 	if len(components) > 3 {
 		buildNum, err = strconv.ParseUint(components[3], 10, 32)
 		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
+			return ver, errors.Errorf("invalid version string %s", versStr)
 		}
 	}
 
@@ -252,7 +258,7 @@ func (img *Image) Json() (string, error) {
 
 	b, err := json.MarshalIndent(m, "", "    ")
 	if err != nil {
-		return "", util.ChildNewtError(err)
+		return "", errors.Wrapf(err, "failed to marshal image")
 	}
 
 	return string(b), nil
@@ -263,13 +269,13 @@ func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
 
 	err := binary.Write(w, binary.LittleEndian, &tlv.Header)
 	if err != nil {
-		return totalSize, util.ChildNewtError(err)
+		return totalSize, errors.Wrapf(err, "failed to write image TLV header")
 	}
 	totalSize += IMAGE_TLV_SIZE
 
 	size, err := w.Write(tlv.Data)
 	if err != nil {
-		return totalSize, util.ChildNewtError(err)
+		return totalSize, errors.Wrapf(err, "failed to write image TLV data")
 	}
 	totalSize += size
 
@@ -294,7 +300,7 @@ func (i *Image) FindUniqueTlv(tlvType uint8) (*ImageTlv, error) {
 		return nil, nil
 	}
 	if len(tlvs) > 1 {
-		return nil, util.FmtNewtError("Image contains %d TLVs with type %d",
+		return nil, errors.Errorf("image contains %d TLVs with type %d",
 			len(tlvs), tlvType)
 	}
 
@@ -338,11 +344,12 @@ func (img *Image) Trailer() ImageTrailer {
 func (i *Image) Hash() ([]byte, error) {
 	tlv, err := i.FindUniqueTlv(IMAGE_TLV_SHA256)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to retrieve image hash")
 	}
 
 	if tlv == nil {
-		return nil, util.FmtNewtError("Image does not contain hash TLV")
+		return nil, errors.Errorf(
+			"failed to retrieve image hash: image does not contain hash TLV")
 	}
 
 	return tlv.Data, nil
@@ -360,20 +367,20 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 
 	err := binary.Write(w, binary.LittleEndian, &i.Header)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image header")
 	}
 	offset += IMAGE_HEADER_SIZE
 
 	err = binary.Write(w, binary.LittleEndian, i.Pad)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image padding")
 	}
 	offset += len(i.Pad)
 
 	offs.Body = offset
 	size, err := w.Write(i.Body)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image body")
 	}
 	offset += size
 
@@ -381,7 +388,7 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 	offs.Trailer = offset
 	err = binary.Write(w, binary.LittleEndian, &trailer)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image trailer")
 	}
 	offset += IMAGE_TRAILER_SIZE
 
@@ -389,7 +396,7 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 		offs.Tlvs = append(offs.Tlvs, offset)
 		size, err := tlv.Write(w)
 		if err != nil {
-			return offs, util.ChildNewtError(err)
+			return offs, errors.Wrapf(err, "failed to write image TLV")
 		}
 		offset += size
 	}
@@ -423,14 +430,45 @@ func (i *Image) Write(w io.Writer) (int, error) {
 func (i *Image) WriteToFile(filename string) error {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
-		return util.ChildNewtError(err)
+		return errors.Wrapf(err, "failed to open image destination file")
 	}
 
 	if _, err := i.Write(f); err != nil {
-		return util.ChildNewtError(err)
+		return errors.Wrapf(err, "failed to write image")
 	}
 
 	return nil
+}
+
+func (img *Image) CollectSigs() ([]sec.Sig, error) {
+	var sigs []sec.Sig
+
+	var keyHashTlv *ImageTlv
+	for i, _ := range img.Tlvs {
+		t := &img.Tlvs[i]
+
+		if t.Header.Type == IMAGE_TLV_KEYHASH {
+			if keyHashTlv != nil {
+				return nil, errors.Errorf(
+					"image contains keyhash tlv without subsequent signature")
+			}
+			keyHashTlv = t
+		} else if ImageTlvTypeIsSig(t.Header.Type) {
+			if keyHashTlv == nil {
+				return nil, errors.Errorf(
+					"image contains signature tlv without preceding keyhash")
+			}
+
+			sigs = append(sigs, sec.Sig{
+				KeyHash: keyHashTlv.Data,
+				Data:    t.Data,
+			})
+
+			keyHashTlv = nil
+		}
+	}
+
+	return sigs, nil
 }
 
 func parseRawHeader(imgData []byte, offset int) (ImageHdr, int, error) {
@@ -440,20 +478,19 @@ func parseRawHeader(imgData []byte, offset int) (ImageHdr, int, error) {
 	r.Seek(int64(offset), io.SeekStart)
 
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return hdr, 0, util.FmtNewtError(
-			"Error reading image header: %s", err.Error())
+		return hdr, 0, errors.Wrapf(err, "error reading image header")
 	}
 
 	if hdr.Magic != IMAGE_MAGIC {
-		return hdr, 0, util.FmtNewtError(
-			"Image magic incorrect; expected 0x%08x, got 0x%08x",
+		return hdr, 0, errors.Errorf(
+			"image magic incorrect; expected 0x%08x, got 0x%08x",
 			uint32(IMAGE_MAGIC), hdr.Magic)
 	}
 
 	remLen := len(imgData) - offset
 	if remLen < int(hdr.HdrSz) {
-		return hdr, 0, util.FmtNewtError(
-			"Image header incomplete; expected %d bytes, got %d bytes",
+		return hdr, 0, errors.Errorf(
+			"image header incomplete; expected %d bytes, got %d bytes",
 			hdr.HdrSz, remLen)
 	}
 
@@ -467,8 +504,8 @@ func parseRawBody(imgData []byte, hdr ImageHdr,
 	remLen := len(imgData) - offset
 
 	if remLen < imgSz {
-		return nil, 0, util.FmtNewtError(
-			"Image body incomplete; expected %d bytes, got %d bytes",
+		return nil, 0, errors.Errorf(
+			"image body incomplete; expected %d bytes, got %d bytes",
 			imgSz, remLen)
 	}
 
@@ -482,9 +519,8 @@ func parseRawTrailer(imgData []byte, offset int) (ImageTrailer, int, error) {
 	r.Seek(int64(offset), io.SeekStart)
 
 	if err := binary.Read(r, binary.LittleEndian, &trailer); err != nil {
-		return trailer, 0, util.FmtNewtError(
-			"Image contains invalid trailer at offset %d: %s",
-			offset, err.Error())
+		return trailer, 0, errors.Wrapf(err,
+			"image contains invalid trailer at offset %d", offset)
 	}
 
 	return trailer, IMAGE_TRAILER_SIZE, nil
@@ -497,14 +533,14 @@ func parseRawTlv(imgData []byte, offset int) (ImageTlv, int, error) {
 	r.Seek(int64(offset), io.SeekStart)
 
 	if err := binary.Read(r, binary.LittleEndian, &tlv.Header); err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Image contains invalid TLV at offset %d: %s", offset, err.Error())
+		return tlv, 0, errors.Wrapf(err,
+			"image contains invalid TLV at offset %d", offset)
 	}
 
 	tlv.Data = make([]byte, tlv.Header.Len)
 	if _, err := r.Read(tlv.Data); err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Image contains invalid TLV at offset %d: %s", offset, err.Error())
+		return tlv, 0, errors.Wrapf(err,
+			"image contains invalid TLV at offset %d", offset)
 	}
 
 	return tlv, IMAGE_TLV_SIZE + int(tlv.Header.Len), nil
@@ -532,6 +568,15 @@ func ParseImage(imgData []byte) (Image, error) {
 	}
 	offset += size
 
+	totalLen := IMAGE_HEADER_SIZE + len(body) + int(trailer.TlvTotLen)
+	if len(imgData) < totalLen {
+		return img, errors.Errorf("image data truncated: have=%d want=%d",
+			len(imgData), totalLen)
+	}
+
+	// Trim excess data following image trailer.
+	imgData = imgData[:totalLen]
+
 	var tlvs []ImageTlv
 	tlvLen := IMAGE_TRAILER_SIZE
 	for offset < len(imgData) {
@@ -541,13 +586,17 @@ func ParseImage(imgData []byte) (Image, error) {
 		}
 
 		tlvs = append(tlvs, tlv)
-		offset += size
 
-		tlvLen += IMAGE_TLV_SIZE + int(tlv.Header.Len)
+		offset += size
+		if offset > len(imgData) {
+			return img, errors.Errorf("TLVs extend beyond end of image")
+		}
+
+		tlvLen += size
 	}
 
 	if int(trailer.TlvTotLen) != tlvLen {
-		return img, util.FmtNewtError(
+		return img, errors.Errorf(
 			"invalid image: trailer indicates TLV-length=%d; actual=%d",
 			trailer.TlvTotLen, tlvLen)
 	}
@@ -564,7 +613,7 @@ func ReadImage(filename string) (Image, error) {
 
 	imgData, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return ri, util.ChildNewtError(err)
+		return ri, errors.Wrapf(err, "failed to read image from file")
 	}
 
 	return ParseImage(imgData)

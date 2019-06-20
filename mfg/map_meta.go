@@ -25,7 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
@@ -33,8 +33,7 @@ func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
 
 	readBody := func(dst interface{}) error {
 		if err := binary.Read(r, binary.LittleEndian, dst); err != nil {
-			return util.FmtNewtError(
-				"Error parsing TLV data: %s", err.Error())
+			return errors.Wrapf(err, "error parsing TLV data")
 		}
 		return nil
 	}
@@ -62,8 +61,7 @@ func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
 		return body.Map(), nil
 
 	default:
-		return nil, util.FmtNewtError(
-			"Unknown meta TLV type: %d", t.Header.Type)
+		return nil, errors.Errorf("unknown meta TLV type: %d", t.Header.Type)
 	}
 }
 
@@ -88,7 +86,7 @@ func (b *MetaTlvBodyMmrRef) Map() map[string]interface{} {
 	}
 }
 
-func (t *MetaTlv) Map(offset int) map[string]interface{} {
+func (t *MetaTlv) Map(index int, offset int) map[string]interface{} {
 	hmap := map[string]interface{}{
 		"_type_name": MetaTlvTypeName(t.Header.Type),
 		"type":       t.Header.Type,
@@ -105,6 +103,7 @@ func (t *MetaTlv) Map(offset int) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
+		"_index":  index,
 		"_offset": offset,
 		"header":  hmap,
 		"data":    body,
@@ -126,7 +125,7 @@ func (m *Meta) Map(endOffset int) map[string]interface{} {
 
 	tlvs := []map[string]interface{}{}
 	for i, t := range m.Tlvs {
-		tlv := t.Map(startOffset + offsets.Tlvs[i])
+		tlv := t.Map(i, startOffset+offsets.Tlvs[i])
 		tlvs = append(tlvs, tlv)
 	}
 
@@ -146,7 +145,7 @@ func (m *Meta) Json(offset int) (string, error) {
 
 	bin, err := json.MarshalIndent(mmap, "", "    ")
 	if err != nil {
-		return "", util.ChildNewtError(err)
+		return "", errors.Wrapf(err, "failed to marshal MMR")
 	}
 
 	return string(bin), nil

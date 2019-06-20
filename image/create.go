@@ -28,12 +28,11 @@ import (
 	"crypto/sha256"
 	"encoding/asn1"
 	"encoding/binary"
-	"encoding/hex"
 	"io/ioutil"
 	"math/big"
 
-	"mynewt.apache.org/newt/artifact/sec"
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 type ImageCreator struct {
@@ -100,7 +99,7 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 	} else if len(cipherSecret) == 24 {
 		encType = IMAGE_TLV_ENC_KEK
 	} else {
-		return ImageTlv{}, util.FmtNewtError("Invalid enc TLV size ")
+		return ImageTlv{}, errors.Errorf("invalid enc TLV size: %d", len(cipherSecret))
 	}
 
 	return ImageTlv{
@@ -120,7 +119,7 @@ func GenerateSigRsa(key sec.SignKey, hash []byte) ([]byte, error) {
 	signature, err := rsa.SignPSS(
 		rand.Reader, key.Rsa, crypto.SHA256, hash, &opts)
 	if err != nil {
-		return nil, util.FmtNewtError("Failed to compute signature: %s", err)
+		return nil, errors.Wrapf(err, "failed to compute signature")
 	}
 
 	return signature, nil
@@ -129,7 +128,7 @@ func GenerateSigRsa(key sec.SignKey, hash []byte) ([]byte, error) {
 func GenerateSigEc(key sec.SignKey, hash []byte) ([]byte, error) {
 	r, s, err := ecdsa.Sign(rand.Reader, key.Ec, hash)
 	if err != nil {
-		return nil, util.FmtNewtError("Failed to compute signature: %s", err)
+		return nil, errors.Wrapf(err, "failed to compute signature")
 	}
 
 	ECDSA := ECDSASig{
@@ -139,12 +138,12 @@ func GenerateSigEc(key sec.SignKey, hash []byte) ([]byte, error) {
 
 	signature, err := asn1.Marshal(ECDSA)
 	if err != nil {
-		return nil, util.FmtNewtError("Failed to construct signature: %s", err)
+		return nil, errors.Wrapf(err, "failed to construct signature")
 	}
 
 	sigLen := key.SigLen()
 	if len(signature) > int(sigLen) {
-		return nil, util.FmtNewtError("Something is really wrong\n")
+		return nil, errors.Errorf("signature truncated")
 	}
 
 	pad := make([]byte, int(sigLen)-len(signature))
@@ -210,8 +209,7 @@ func BuildSigTlvs(keys []sec.SignKey, hash []byte) ([]ImageTlv, error) {
 func GeneratePlainSecret() ([]byte, error) {
 	plainSecret := make([]byte, 16)
 	if _, err := rand.Read(plainSecret); err != nil {
-		return nil, util.FmtNewtError(
-			"Random generation error: %s\n", err)
+		return nil, errors.Wrapf(err, "random generation error")
 	}
 
 	return plainSecret, nil
@@ -238,7 +236,7 @@ func GenerateCipherSecret(pubKeBytes []byte,
 		return sec.EncryptSecretAes(aesPubKe, plainSecret)
 	}
 
-	return nil, util.FmtNewtError("Invalid image-crypt key")
+	return nil, errors.Errorf("invalid image-crypt key")
 }
 
 func GenerateImage(opts ImageCreateOpts) (Image, error) {
@@ -246,8 +244,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 
 	srcBin, err := ioutil.ReadFile(opts.SrcBinFilename)
 	if err != nil {
-		return Image{}, util.FmtNewtError(
-			"Can't read app binary: %s", err.Error())
+		return Image{}, errors.Wrapf(err, "Can't read app binary")
 	}
 
 	ic.Body = srcBin
@@ -269,8 +266,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 
 		pubKeBytes, err := ioutil.ReadFile(opts.SrcEncKeyFilename)
 		if err != nil {
-			return Image{}, util.FmtNewtError(
-				"Error reading pubkey file: %s", err.Error())
+			return Image{}, errors.Wrapf(err, "error reading pubkey file")
 		}
 
 		cipherSecret, err := GenerateCipherSecret(pubKeBytes, plainSecret)
@@ -301,7 +297,7 @@ func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
 			return err
 		}
 		if err := binary.Write(hash, binary.LittleEndian, itf); err != nil {
-			return util.FmtNewtError("Failed to hash data: %s", err.Error())
+			return errors.Wrapf(err, "failed to hash data")
 		}
 
 		return nil
@@ -364,8 +360,8 @@ func (ic *ImageCreator) Create() (Image, error) {
 		// between the header and the start of the image when it is padded.
 		extra := ic.HeaderSize - IMAGE_HEADER_SIZE
 		if extra < 0 {
-			return img, util.FmtNewtError("Image header must be at "+
-				"least %d bytes", IMAGE_HEADER_SIZE)
+			return img, errors.Errorf(
+				"image header must be at least %d bytes", IMAGE_HEADER_SIZE)
 		}
 
 		img.Header.HdrSz = uint16(ic.HeaderSize)
@@ -387,9 +383,6 @@ func (ic *ImageCreator) Create() (Image, error) {
 	} else {
 		img.Body = append(img.Body, ic.Body...)
 	}
-
-	util.StatusMessage(util.VERBOSITY_VERBOSE,
-		"Computed Hash for image as %s\n", hex.EncodeToString(hashBytes))
 
 	// Hash TLV.
 	tlv := ImageTlv{

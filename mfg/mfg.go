@@ -20,9 +20,11 @@
 package mfg
 
 import (
+	"bytes"
 	"crypto/sha256"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/flash"
 )
 
 const MFG_BIN_IMG_FILENAME = "mfgimg.bin"
@@ -43,12 +45,22 @@ func Parse(data []byte, metaEndOff int, eraseVal byte) (Mfg, error) {
 	}
 
 	if metaEndOff >= 0 {
+		if metaEndOff > len(data) {
+			return m, errors.Errorf(
+				"MMR offset (%d) beyond end of mfgimage (%d)",
+				metaEndOff, len(data))
+		}
+
 		meta, _, err := ParseMeta(data[:metaEndOff])
 		if err != nil {
 			return m, err
 		}
 		m.Meta = &meta
 		m.MetaOff = metaEndOff - int(meta.Footer.Size)
+
+		for i := 0; i < int(meta.Footer.Size); i++ {
+			m.Bin[m.MetaOff+i] = eraseVal
+		}
 	}
 
 	return m, nil
@@ -85,50 +97,76 @@ func CalcHash(bin []byte) []byte {
 	return hash[:]
 }
 
-func (m *Mfg) RecalcHash(eraseVal byte) error {
+func (m *Mfg) RecalcHash(eraseVal byte) ([]byte, error) {
+	// The hash TLV needs to be zeroed out in order to calculate the mfg
+	// hash.  Duplicate the mfg object so that we don't modify the
+	// original.
+	dup := m.Clone()
+	if dup.Meta != nil {
+		dup.Meta.ClearHash()
+	}
+
+	bin, err := dup.Bytes(eraseVal)
+	if err != nil {
+		return nil, err
+	}
+
+	return CalcHash(bin), nil
+}
+
+func (m *Mfg) RefillHash(eraseVal byte) error {
 	if m.Meta == nil || m.Meta.Hash() == nil {
 		return nil
 	}
+	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
+	if tlv == nil {
+		return nil
+	}
 
-	// First, write with zeroed hash.
-	m.Meta.ClearHash()
-	bin, err := m.Bytes(eraseVal)
+	// Calculate hash.
+	hash, err := m.RecalcHash(eraseVal)
 	if err != nil {
 		return err
 	}
 
-	// Calculate hash and fill TLV.
-	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
-	if tlv != nil {
-		hashData := CalcHash(bin)
-		copy(tlv.Data, hashData)
-
-		hashOff := m.MetaOff + m.Meta.HashOffset()
-		if hashOff+META_HASH_SZ > len(bin) {
-			return util.FmtNewtError(
-				"unexpected error: hash extends beyond end " +
-					"of manufacturing image")
-		}
-	}
+	// Fill hash TLV.
+	copy(tlv.Data, hash)
 
 	return nil
 }
 
-func (m *Mfg) Hash() ([]byte, error) {
+func (m *Mfg) Hash(eraseVal byte) ([]byte, error) {
 	var hashBytes []byte
+
 	if m.Meta != nil {
 		hashBytes = m.Meta.Hash()
 	}
+
 	if hashBytes == nil {
 		// No hash TLV; calculate hash manually.
-		bin, err := m.Bytes(0xff)
+		b, err := m.RecalcHash(eraseVal)
 		if err != nil {
 			return nil, err
 		}
-		hashBytes = CalcHash(bin)
+		hashBytes = b
 	}
 
 	return hashBytes, nil
+}
+
+func (m *Mfg) HashIsValid(eraseVal byte) (bool, error) {
+	// If the mfg doesn't contain a hash TLV, then there is nothing to verify.
+	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
+	if tlv == nil {
+		return true, nil
+	}
+
+	hash, err := m.RecalcHash(eraseVal)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(hash, tlv.Data), nil
 }
 
 func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
@@ -148,4 +186,52 @@ func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
 	copy(binCopy[m.MetaOff:m.MetaOff+len(metaBytes)], metaBytes)
 
 	return binCopy, nil
+}
+
+func (m *Mfg) Clone() Mfg {
+	var meta *Meta
+	if m.Meta != nil {
+		metaDup := m.Meta.Clone()
+		meta = &metaDup
+	}
+
+	bin := make([]byte, len(m.Bin))
+	copy(bin, m.Bin)
+
+	return Mfg{
+		Bin:     bin,
+		Meta:    meta,
+		MetaOff: m.MetaOff,
+	}
+}
+
+func (m *Mfg) ExtractFlashArea(area flash.FlashArea, eraseVal byte) ([]byte, error) {
+	b, err := m.Bytes(eraseVal)
+	if err != nil {
+		return nil, err
+	}
+
+	if area.Offset >= len(b) {
+		return nil, errors.Errorf(
+			"flash area in mmr (\"%s\") is beyond end of mfgimage "+
+				"(offset=%d mfgimg_len=%d)",
+			area.Name, area.Offset, len(b))
+	}
+
+	// If the end of the target contains unwritten bytes, it gets truncated
+	// from the mfgimage.
+	end := area.Offset + area.Size
+	if end > len(b) {
+		end = len(b)
+	}
+
+	return b[area.Offset:end], nil
+}
+
+func (m *Mfg) Tlvs() []MetaTlv {
+	if m.Meta == nil {
+		return nil
+	} else {
+		return m.Meta.Tlvs
+	}
 }

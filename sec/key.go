@@ -33,14 +33,18 @@ import (
 	"io/ioutil"
 
 	keywrap "github.com/NickBall/go-aes-key-wrap"
-
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 type SignKey struct {
 	// Only one of these members is non-nil.
 	Rsa *rsa.PrivateKey
 	Ec  *ecdsa.PrivateKey
+}
+
+type PubSignKey struct {
+	Rsa *rsa.PublicKey
+	Ec  *ecdsa.PublicKey
 }
 
 func ParsePrivateKey(keyBytes []byte) (interface{}, error) {
@@ -63,8 +67,7 @@ func ParsePrivateKey(keyBytes []byte) (interface{}, error) {
 		 */
 		privKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, util.FmtNewtError(
-				"Private key parsing failed: %s", err)
+			return nil, errors.Wrapf(err, "Private key parsing failed")
 		}
 	}
 	if block != nil && block.Type == "EC PRIVATE KEY" {
@@ -73,8 +76,7 @@ func ParsePrivateKey(keyBytes []byte) (interface{}, error) {
 		 */
 		privKey, err = x509.ParseECPrivateKey(block.Bytes)
 		if err != nil {
-			return nil, util.FmtNewtError(
-				"Private key parsing failed: %s", err)
+			return nil, errors.Wrapf(err, "Private key parsing failed")
 		}
 	}
 	if block != nil && block.Type == "PRIVATE KEY" {
@@ -83,8 +85,7 @@ func ParsePrivateKey(keyBytes []byte) (interface{}, error) {
 		// the key itself.
 		privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, util.FmtNewtError(
-				"Private key parsing failed: %s", err)
+			return nil, errors.Wrapf(err, "Private key parsing failed")
 		}
 	}
 	if block != nil && block.Type == "ENCRYPTED PRIVATE KEY" {
@@ -92,12 +93,12 @@ func ParsePrivateKey(keyBytes []byte) (interface{}, error) {
 		// encryption.
 		privKey, err = parseEncryptedPrivateKey(block.Bytes)
 		if err != nil {
-			return nil, util.FmtNewtError(
-				"Unable to decode encrypted private key: %s", err)
+			return nil, errors.Wrapf(
+				err, "Unable to decode encrypted private key")
 		}
 	}
 	if privKey == nil {
-		return nil, util.NewNewtError(
+		return nil, errors.Errorf(
 			"Unknown private key format, EC/RSA private " +
 				"key in PEM format only.")
 	}
@@ -119,7 +120,7 @@ func BuildPrivateKey(keyBytes []byte) (SignKey, error) {
 	case *ecdsa.PrivateKey:
 		key.Ec = priv
 	default:
-		return key, util.NewNewtError("Unknown private key format")
+		return key, errors.Errorf("Unknown private key format")
 	}
 
 	return key, nil
@@ -128,8 +129,7 @@ func BuildPrivateKey(keyBytes []byte) (SignKey, error) {
 func ReadKey(filename string) (SignKey, error) {
 	keyBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return SignKey{}, util.FmtNewtError(
-			"Error reading key file: %s", err)
+		return SignKey{}, errors.Wrapf(err, "Error reading key file")
 	}
 
 	return BuildPrivateKey(keyBytes)
@@ -154,31 +154,21 @@ func (key *SignKey) AssertValid() {
 	if key.Rsa == nil && key.Ec == nil {
 		panic("invalid key; neither RSA nor ECC")
 	}
+}
 
-	if key.Rsa != nil && key.Ec != nil {
-		panic("invalid key; neither RSA nor ECC")
+func (key *SignKey) PubKey() PubSignKey {
+	key.AssertValid()
+
+	if key.Rsa != nil {
+		return PubSignKey{Rsa: &key.Rsa.PublicKey}
+	} else {
+		return PubSignKey{Ec: &key.Ec.PublicKey}
 	}
 }
 
-func (key *SignKey) PubBytes() ([]uint8, error) {
-	key.AssertValid()
-
-	var pubkey []byte
-
-	if key.Rsa != nil {
-		pubkey, _ = asn1.Marshal(key.Rsa.PublicKey)
-	} else {
-		switch key.Ec.Curve.Params().Name {
-		case "P-224":
-			fallthrough
-		case "P-256":
-			pubkey, _ = x509.MarshalPKIXPublicKey(&key.Ec.PublicKey)
-		default:
-			return nil, util.NewNewtError("Unsupported ECC curve")
-		}
-	}
-
-	return pubkey, nil
+func (key *SignKey) PubBytes() ([]byte, error) {
+	pk := key.PubKey()
+	return pk.PubBytes()
 }
 
 func RawKeyHash(pubKeyBytes []byte) []byte {
@@ -211,13 +201,12 @@ func ParsePubKePem(keyBytes []byte) (*rsa.PublicKey, error) {
 	}
 
 	if b.Type != "PUBLIC KEY" && b.Type != "RSA PUBLIC KEY" {
-		return nil, util.NewNewtError("Invalid PEM file")
+		return nil, errors.Errorf("Invalid PEM file")
 	}
 
 	pub, err := x509.ParsePKIXPublicKey(b.Bytes)
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error parsing pubkey file: %s", err.Error())
+		return nil, errors.Wrapf(err, "Error parsing pubkey file")
 	}
 
 	var pubk *rsa.PublicKey
@@ -225,8 +214,7 @@ func ParsePubKePem(keyBytes []byte) (*rsa.PublicKey, error) {
 	case *rsa.PublicKey:
 		pubk = pub.(*rsa.PublicKey)
 	default:
-		return nil, util.FmtNewtError(
-			"Error parsing pubkey file: %s", err.Error())
+		return nil, errors.Wrapf(err, "Error parsing pubkey file")
 	}
 
 	return pubk, nil
@@ -235,8 +223,7 @@ func ParsePubKePem(keyBytes []byte) (*rsa.PublicKey, error) {
 func ParsePrivKeDer(keyBytes []byte) (*rsa.PrivateKey, error) {
 	privKey, err := x509.ParsePKCS1PrivateKey(keyBytes)
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error parsing private key file: %s", err.Error())
+		return nil, errors.Wrapf(err, "Error parsing private key file")
 	}
 
 	return privKey, nil
@@ -247,8 +234,7 @@ func EncryptSecretRsa(pubk *rsa.PublicKey, plainSecret []byte) ([]byte, error) {
 	cipherSecret, err := rsa.EncryptOAEP(
 		sha256.New(), rng, pubk, plainSecret, nil)
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error from encryption: %s\n", err.Error())
+		return nil, errors.Wrapf(err, "Error from encryption")
 	}
 
 	return cipherSecret, nil
@@ -261,8 +247,7 @@ func DecryptSecretRsa(privk *rsa.PrivateKey,
 	plainSecret, err := rsa.DecryptOAEP(
 		sha256.New(), rng, privk, cipherSecret, nil)
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error from encryption: %s\n", err.Error())
+		return nil, errors.Wrapf(err, "Error from encryption")
 	}
 
 	return plainSecret, nil
@@ -271,18 +256,18 @@ func DecryptSecretRsa(privk *rsa.PrivateKey,
 func ParseKeBase64(keyBytes []byte) (cipher.Block, error) {
 	kek, err := base64.StdEncoding.DecodeString(string(keyBytes))
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error decoding kek: %s", err.Error())
+		return nil, errors.Wrapf(err,
+			"Error decoding kek: %s")
 	}
 	if len(kek) != 16 {
-		return nil, util.FmtNewtError(
+		return nil, errors.Errorf(
 			"Unexpected key size: %d != 16", len(kek))
 	}
 
 	cipher, err := aes.NewCipher(kek)
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Error creating keywrap cipher: %s", err.Error())
+		return nil, errors.Wrapf(err,
+			"Error creating keywrap cipher")
 	}
 
 	return cipher, nil
@@ -291,8 +276,39 @@ func ParseKeBase64(keyBytes []byte) (cipher.Block, error) {
 func EncryptSecretAes(c cipher.Block, plainSecret []byte) ([]byte, error) {
 	cipherSecret, err := keywrap.Wrap(c, plainSecret)
 	if err != nil {
-		return nil, util.FmtNewtError("Error key-wrapping: %s", err.Error())
+		return nil, errors.Wrapf(err, "Error key-wrapping")
 	}
 
 	return cipherSecret, nil
+}
+
+func (key *PubSignKey) AssertValid() {
+	if key.Rsa == nil && key.Ec == nil {
+		panic("invalid public key; neither RSA nor ECC")
+	}
+}
+
+func (key *PubSignKey) PubBytes() ([]byte, error) {
+	key.AssertValid()
+
+	var pubBytes []byte
+
+	if key.Rsa != nil {
+		var err error
+		pubBytes, err = asn1.Marshal(*key.Rsa)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		switch key.Ec.Curve.Params().Name {
+		case "P-224":
+			fallthrough
+		case "P-256":
+			pubBytes, _ = x509.MarshalPKIXPublicKey(*key.Ec)
+		default:
+			return nil, errors.Errorf("unsupported ECC curve")
+		}
+	}
+
+	return pubBytes, nil
 }

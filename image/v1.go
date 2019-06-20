@@ -30,12 +30,11 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"io"
 	"io/ioutil"
 
-	"mynewt.apache.org/newt/artifact/sec"
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 const IMAGEv1_MAGIC = 0x96f3b83c /* Image header magic */
@@ -95,10 +94,10 @@ func (img *ImageV1) FindTlvs(tlvType uint8) []ImageTlv {
 func (img *ImageV1) Hash() ([]byte, error) {
 	tlvs := img.FindTlvs(IMAGEv1_TLV_SHA256)
 	if len(tlvs) == 0 {
-		return nil, util.FmtNewtError("Image does not contain hash TLV")
+		return nil, errors.Errorf("image does not contain hash TLV")
 	}
 	if len(tlvs) > 1 {
-		return nil, util.FmtNewtError("Image contains %d hash TLVs", len(tlvs))
+		return nil, errors.Errorf("image contains %d hash TLVs", len(tlvs))
 	}
 
 	return tlvs[0].Data, nil
@@ -112,14 +111,14 @@ func (img *ImageV1) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 
 	err := binary.Write(w, binary.LittleEndian, &img.Header)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image header")
 	}
 	offset += IMAGE_HEADER_SIZE
 
 	offs.Body = offset
 	size, err := w.Write(img.Body)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image body")
 	}
 	offset += size
 
@@ -127,7 +126,7 @@ func (img *ImageV1) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 		offs.Tlvs = append(offs.Tlvs, offset)
 		size, err := tlv.Write(w)
 		if err != nil {
-			return offs, util.ChildNewtError(err)
+			return offs, errors.Wrapf(err, "failed to write image TLV")
 		}
 		offset += size
 	}
@@ -174,7 +173,7 @@ func sigHdrTypeV1(key sec.SignKey) (uint32, error) {
 		case "P-256":
 			return IMAGEv1_F_ECDSA256_SHA256, nil
 		default:
-			return 0, util.FmtNewtError("Unsupported ECC curve")
+			return 0, errors.Errorf("unsupported ECC curve")
 		}
 	}
 }
@@ -211,7 +210,7 @@ func generateV1SigRsa(key *rsa.PrivateKey, hash []byte) ([]byte, error) {
 			rand.Reader, key, crypto.SHA256, hash)
 	}
 	if err != nil {
-		return nil, util.FmtNewtError("Failed to compute signature: %s", err)
+		return nil, errors.Wrapf(err, "failed to compute signature")
 	}
 
 	return signature, nil
@@ -241,20 +240,19 @@ func generateV1SigTlvEc(key sec.SignKey, hash []byte) (ImageTlv, error) {
 
 	sigLen := key.SigLen()
 	if len(sig) > int(sigLen) {
-		return ImageTlv{}, util.FmtNewtError("Something is really wrong\n")
+		return ImageTlv{}, errors.Errorf("signature truncated")
 	}
 
 	b := &bytes.Buffer{}
 
 	if _, err := b.Write(sig); err != nil {
-		return ImageTlv{},
-			util.FmtNewtError("Failed to append sig: %s", err.Error())
+		return ImageTlv{}, errors.Wrapf(err, "failed to append sig")
 	}
 
 	pad := make([]byte, int(sigLen)-len(sig))
 	if _, err := b.Write(pad); err != nil {
-		return ImageTlv{}, util.FmtNewtError(
-			"Failed to serialize image trailer: %s", err.Error())
+		return ImageTlv{}, errors.Wrapf(err,
+			"failed to serialize image trailer")
 	}
 
 	return ImageTlv{
@@ -284,7 +282,7 @@ func calcHashV1(initialHash []byte, hdr ImageHdrV1,
 
 	add := func(itf interface{}) error {
 		if err := binary.Write(hash, binary.LittleEndian, itf); err != nil {
-			return util.FmtNewtError("Failed to hash data: %s", err.Error())
+			return errors.Wrapf(err, "failed to hash data")
 		}
 
 		return nil
@@ -319,8 +317,8 @@ func (ic *ImageCreator) CreateV1() (ImageV1, error) {
 	ri := ImageV1{}
 
 	if len(ic.SigKeys) > 1 {
-		return ri, util.FmtNewtError(
-			"V1 image format only allows one key, %d keys specified",
+		return ri, errors.Errorf(
+			"v1 image format only allows one key, %d keys specified",
 			len(ic.SigKeys))
 	}
 
@@ -349,8 +347,8 @@ func (ic *ImageCreator) CreateV1() (ImageV1, error) {
 		 * the image when it is padded.
 		 */
 		if ic.HeaderSize < IMAGE_HEADER_SIZE {
-			return ri, util.FmtNewtError("Image header must be at "+
-				"least %d bytes", IMAGE_HEADER_SIZE)
+			return ri, errors.Errorf(
+				"image header must be at least %d bytes", IMAGE_HEADER_SIZE)
 		}
 
 		hdr.HdrSz = uint16(ic.HeaderSize)
@@ -372,8 +370,8 @@ func (ic *ImageCreator) CreateV1() (ImageV1, error) {
 		// the image when it is padded.
 		extra := ic.HeaderSize - IMAGE_HEADER_SIZE
 		if extra < 0 {
-			return ri, util.FmtNewtError("Image header must be at "+
-				"least %d bytes", IMAGE_HEADER_SIZE)
+			return ri, errors.Errorf(
+				"image header must be at least %d bytes", IMAGE_HEADER_SIZE)
 		}
 
 		hdr.HdrSz = uint16(ic.HeaderSize)
@@ -387,9 +385,6 @@ func (ic *ImageCreator) CreateV1() (ImageV1, error) {
 		return ri, err
 	}
 
-	util.StatusMessage(util.VERBOSITY_VERBOSE,
-		"Computed Hash for image as %s\n", hex.EncodeToString(hashBytes))
-
 	/*
 	 * Followed by data.
 	 */
@@ -399,16 +394,14 @@ func (ic *ImageCreator) CreateV1() (ImageV1, error) {
 	for {
 		cnt, err := r.Read(dataBuf)
 		if err != nil && err != io.EOF {
-			return ri, util.FmtNewtError(
-				"Failed to read from image body: %s", err.Error())
+			return ri, errors.Wrapf(err, "failed to read from image body")
 		}
 		if cnt == 0 {
 			break
 		}
 
 		if _, err = w.Write(dataBuf[0:cnt]); err != nil {
-			return ri, util.FmtNewtError(
-				"Failed to write to image body: %s", err.Error())
+			return ri, errors.Wrapf(err, "failed to write to image body")
 		}
 	}
 	ri.Body = w.Bytes()
@@ -448,8 +441,7 @@ func GenerateV1Image(opts ImageCreateOpts) (ImageV1, error) {
 
 	srcBin, err := ioutil.ReadFile(opts.SrcBinFilename)
 	if err != nil {
-		return ImageV1{}, util.FmtNewtError(
-			"Can't read app binary: %s", err.Error())
+		return ImageV1{}, errors.Wrapf(err, "can't read app binary")
 	}
 
 	ic.Body = srcBin
@@ -471,8 +463,7 @@ func GenerateV1Image(opts ImageCreateOpts) (ImageV1, error) {
 
 		pubKeBytes, err := ioutil.ReadFile(opts.SrcEncKeyFilename)
 		if err != nil {
-			return ImageV1{}, util.FmtNewtError(
-				"Error reading pubkey file: %s", err.Error())
+			return ImageV1{}, errors.Wrapf(err, "error reading pubkey file")
 		}
 		cipherSecret, err := GenerateCipherSecret(pubKeBytes, plainSecret)
 		if err != nil {
