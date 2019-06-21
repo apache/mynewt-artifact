@@ -25,7 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
@@ -33,8 +33,7 @@ func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
 
 	readBody := func(dst interface{}) error {
 		if err := binary.Read(r, binary.LittleEndian, dst); err != nil {
-			return util.FmtNewtError(
-				"Error parsing TLV data: %s", err.Error())
+			return errors.Wrapf(err, "error parsing TLV data")
 		}
 		return nil
 	}
@@ -62,8 +61,7 @@ func (t *MetaTlv) bodyMap() (map[string]interface{}, error) {
 		return body.Map(), nil
 
 	default:
-		return nil, util.FmtNewtError(
-			"Unknown meta TLV type: %d", t.Header.Type)
+		return nil, errors.Errorf("unknown meta TLV type: %d", t.Header.Type)
 	}
 }
 
@@ -88,7 +86,8 @@ func (b *MetaTlvBodyMmrRef) Map() map[string]interface{} {
 	}
 }
 
-func (t *MetaTlv) Map(offset int) map[string]interface{} {
+// Map produces a JSON-friendly map representation of an MMR TLV.
+func (t *MetaTlv) Map(index int, offset int) map[string]interface{} {
 	hmap := map[string]interface{}{
 		"_type_name": MetaTlvTypeName(t.Header.Type),
 		"type":       t.Header.Type,
@@ -105,12 +104,14 @@ func (t *MetaTlv) Map(offset int) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
+		"_index":  index,
 		"_offset": offset,
 		"header":  hmap,
 		"data":    body,
 	}
 }
 
+// Map produces a JSON-friendly map representation of an MMR footer.
 func (f *MetaFooter) Map(offset int) map[string]interface{} {
 	return map[string]interface{}{
 		"_offset": offset,
@@ -120,13 +121,14 @@ func (f *MetaFooter) Map(offset int) map[string]interface{} {
 	}
 }
 
+// Map produces a JSON-friendly map representation of an MMR.
 func (m *Meta) Map(endOffset int) map[string]interface{} {
 	offsets := m.Offsets()
 	startOffset := endOffset - int(m.Footer.Size)
 
 	tlvs := []map[string]interface{}{}
 	for i, t := range m.Tlvs {
-		tlv := t.Map(startOffset + offsets.Tlvs[i])
+		tlv := t.Map(i, startOffset+offsets.Tlvs[i])
 		tlvs = append(tlvs, tlv)
 	}
 
@@ -141,12 +143,13 @@ func (m *Meta) Map(endOffset int) map[string]interface{} {
 	}
 }
 
+// Json produces a JSON representation of an MMR.
 func (m *Meta) Json(offset int) (string, error) {
 	mmap := m.Map(offset)
 
 	bin, err := json.MarshalIndent(mmap, "", "    ")
 	if err != nil {
-		return "", util.ChildNewtError(err)
+		return "", errors.Wrapf(err, "failed to marshal MMR")
 	}
 
 	return string(bin), nil

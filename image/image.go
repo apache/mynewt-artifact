@@ -20,18 +20,14 @@
 package image
 
 import (
-	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"strconv"
-	"strings"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 const (
@@ -128,6 +124,11 @@ type ImageOffsets struct {
 	TotalSize int
 }
 
+func ImageTlvTypeIsValid(tlvType uint8) bool {
+	_, ok := imageTlvTypeNameMap[tlvType]
+	return ok
+}
+
 func ImageTlvTypeName(tlvType uint8) string {
 	name, ok := imageTlvTypeNameMap[tlvType]
 	if !ok {
@@ -144,118 +145,9 @@ func ImageTlvTypeIsSig(tlvType uint8) bool {
 		tlvType == IMAGE_TLV_ECDSA256
 }
 
-func ParseVersion(versStr string) (ImageVersion, error) {
-	var err error
-	var major uint64
-	var minor uint64
-	var rev uint64
-	var buildNum uint64
-	var ver ImageVersion
-
-	components := strings.Split(versStr, ".")
-	major, err = strconv.ParseUint(components[0], 10, 8)
-	if err != nil {
-		return ver, util.FmtNewtError("Invalid version string %s", versStr)
-	}
-	if len(components) > 1 {
-		minor, err = strconv.ParseUint(components[1], 10, 8)
-		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
-		}
-	}
-	if len(components) > 2 {
-		rev, err = strconv.ParseUint(components[2], 10, 16)
-		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
-		}
-	}
-	if len(components) > 3 {
-		buildNum, err = strconv.ParseUint(components[3], 10, 32)
-		if err != nil {
-			return ver, util.FmtNewtError("Invalid version string %s", versStr)
-		}
-	}
-
-	ver.Major = uint8(major)
-	ver.Minor = uint8(minor)
-	ver.Rev = uint16(rev)
-	ver.BuildNum = uint32(buildNum)
-	return ver, nil
-}
-
 func (ver ImageVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d.%d",
 		ver.Major, ver.Minor, ver.Rev, ver.BuildNum)
-}
-
-func (h *ImageHdr) Map(offset int) map[string]interface{} {
-	return map[string]interface{}{
-		"magic":   h.Magic,
-		"hdr_sz":  h.HdrSz,
-		"img_sz":  h.ImgSz,
-		"flags":   h.Flags,
-		"vers":    h.Vers.String(),
-		"_offset": offset,
-	}
-}
-
-func rawBodyMap(offset int) map[string]interface{} {
-	return map[string]interface{}{
-		"_offset": offset,
-	}
-}
-
-func (t *ImageTrailer) Map(offset int) map[string]interface{} {
-	return map[string]interface{}{
-		"magic":       t.Magic,
-		"tlv_tot_len": t.TlvTotLen,
-		"_offset":     offset,
-	}
-}
-
-func (t *ImageTlv) Map(offset int) map[string]interface{} {
-	return map[string]interface{}{
-		"type":     t.Header.Type,
-		"len":      t.Header.Len,
-		"data":     hex.EncodeToString(t.Data),
-		"_typestr": ImageTlvTypeName(t.Header.Type),
-		"_offset":  offset,
-	}
-}
-
-func (img *Image) Map() (map[string]interface{}, error) {
-	offs, err := img.Offsets()
-	if err != nil {
-		return nil, err
-	}
-
-	m := map[string]interface{}{}
-	m["header"] = img.Header.Map(offs.Header)
-	m["body"] = rawBodyMap(offs.Body)
-	trailer := img.Trailer()
-	m["trailer"] = trailer.Map(offs.Trailer)
-
-	tlvMaps := []map[string]interface{}{}
-	for i, tlv := range img.Tlvs {
-		tlvMaps = append(tlvMaps, tlv.Map(offs.Tlvs[i]))
-	}
-	m["tlvs"] = tlvMaps
-
-	return m, nil
-}
-
-func (img *Image) Json() (string, error) {
-	m, err := img.Map()
-	if err != nil {
-		return "", err
-	}
-
-	b, err := json.MarshalIndent(m, "", "    ")
-	if err != nil {
-		return "", util.ChildNewtError(err)
-	}
-
-	return string(b), nil
 }
 
 func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
@@ -263,44 +155,62 @@ func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
 
 	err := binary.Write(w, binary.LittleEndian, &tlv.Header)
 	if err != nil {
-		return totalSize, util.ChildNewtError(err)
+		return totalSize, errors.Wrapf(err, "failed to write image TLV header")
 	}
 	totalSize += IMAGE_TLV_SIZE
 
 	size, err := w.Write(tlv.Data)
 	if err != nil {
-		return totalSize, util.ChildNewtError(err)
+		return totalSize, errors.Wrapf(err, "failed to write image TLV data")
 	}
 	totalSize += size
 
 	return totalSize, nil
 }
 
-func (i *Image) FindTlvs(tlvType uint8) []ImageTlv {
-	var tlvs []ImageTlv
+// FindTlvIndices searches an image for TLVs of the specified type and
+// returns their indices.
+func (i *Image) FindTlvIndices(tlvType uint8) []int {
+	var idxs []int
 
-	for _, tlv := range i.Tlvs {
+	for i, tlv := range i.Tlvs {
 		if tlv.Header.Type == tlvType {
-			tlvs = append(tlvs, tlv)
+			idxs = append(idxs, i)
 		}
+	}
+
+	return idxs
+}
+
+// FindTlvs retrieves all TLVs in an image's footer with the specified type.
+func (i *Image) FindTlvs(tlvType uint8) []*ImageTlv {
+	var tlvs []*ImageTlv
+
+	idxs := i.FindTlvIndices(tlvType)
+	for _, idx := range idxs {
+		tlvs = append(tlvs, &i.Tlvs[idx])
 	}
 
 	return tlvs
 }
 
+// FindUniqueTlv retrieves a TLV in an image's footer with the specified
+// type.  It returns an error if there is more than one TLV with this type.
 func (i *Image) FindUniqueTlv(tlvType uint8) (*ImageTlv, error) {
 	tlvs := i.FindTlvs(tlvType)
 	if len(tlvs) == 0 {
 		return nil, nil
 	}
 	if len(tlvs) > 1 {
-		return nil, util.FmtNewtError("Image contains %d TLVs with type %d",
+		return nil, errors.Errorf("image contains %d TLVs with type %d",
 			len(tlvs), tlvType)
 	}
 
-	return &tlvs[0], nil
+	return tlvs[0], nil
 }
 
+// RemoveTlvsIf removes all TLVs from an image that satisfy the supplied
+// predicate.  It returns a slice of the removed TLVs.
 func (i *Image) RemoveTlvsIf(pred func(tlv ImageTlv) bool) []ImageTlv {
 	rmed := []ImageTlv{}
 
@@ -317,12 +227,15 @@ func (i *Image) RemoveTlvsIf(pred func(tlv ImageTlv) bool) []ImageTlv {
 	return rmed
 }
 
+// RemoveTlvsWithType removes from an image all TLVs with the specified type.
+// It returns a slice of the removed TLVs.
 func (i *Image) RemoveTlvsWithType(tlvType uint8) []ImageTlv {
 	return i.RemoveTlvsIf(func(tlv ImageTlv) bool {
 		return tlv.Header.Type == tlvType
 	})
 }
 
+// ImageTrailer constructs an image trailer corresponding to the given image.
 func (img *Image) Trailer() ImageTrailer {
 	trailer := ImageTrailer{
 		Magic:     IMAGE_TRAILER_MAGIC,
@@ -335,23 +248,28 @@ func (img *Image) Trailer() ImageTrailer {
 	return trailer
 }
 
+// Hash retrieves the contents of an image's SHA256 TLV.
 func (i *Image) Hash() ([]byte, error) {
 	tlv, err := i.FindUniqueTlv(IMAGE_TLV_SHA256)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to retrieve image hash")
 	}
 
 	if tlv == nil {
-		return nil, util.FmtNewtError("Image does not contain hash TLV")
+		return nil, errors.Errorf(
+			"failed to retrieve image hash: image does not contain hash TLV")
 	}
 
 	return tlv.Data, nil
 }
 
+// CalcHash calculates a SHA256 of the given image.
 func (i *Image) CalcHash() ([]byte, error) {
 	return calcHash(nil, i.Header, i.Pad, i.Body)
 }
 
+// WritePlusOffsets writes a binary image to the given writer.  It returns
+// the offsets of the image components that got written.
 func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 	offs := ImageOffsets{}
 	offset := 0
@@ -360,20 +278,20 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 
 	err := binary.Write(w, binary.LittleEndian, &i.Header)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image header")
 	}
 	offset += IMAGE_HEADER_SIZE
 
 	err = binary.Write(w, binary.LittleEndian, i.Pad)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image padding")
 	}
 	offset += len(i.Pad)
 
 	offs.Body = offset
 	size, err := w.Write(i.Body)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image body")
 	}
 	offset += size
 
@@ -381,7 +299,7 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 	offs.Trailer = offset
 	err = binary.Write(w, binary.LittleEndian, &trailer)
 	if err != nil {
-		return offs, util.ChildNewtError(err)
+		return offs, errors.Wrapf(err, "failed to write image trailer")
 	}
 	offset += IMAGE_TRAILER_SIZE
 
@@ -389,7 +307,7 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 		offs.Tlvs = append(offs.Tlvs, offset)
 		size, err := tlv.Write(w)
 		if err != nil {
-			return offs, util.ChildNewtError(err)
+			return offs, errors.Wrapf(err, "failed to write image TLV")
 		}
 		offset += size
 	}
@@ -399,10 +317,13 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 	return offs, nil
 }
 
+// Offsets returns the offsets of each of an image's components if it were
+// serialized.
 func (i *Image) Offsets() (ImageOffsets, error) {
 	return i.WritePlusOffsets(ioutil.Discard)
 }
 
+// TotalSize returns the size of the image if it were serialized, in bytes.
 func (i *Image) TotalSize() (int, error) {
 	offs, err := i.Offsets()
 	if err != nil {
@@ -411,6 +332,7 @@ func (i *Image) TotalSize() (int, error) {
 	return offs.TotalSize, nil
 }
 
+// Write serializes and writes a Mynewt image.
 func (i *Image) Write(w io.Writer) (int, error) {
 	offs, err := i.WritePlusOffsets(w)
 	if err != nil {
@@ -420,152 +342,49 @@ func (i *Image) Write(w io.Writer) (int, error) {
 	return offs.TotalSize, nil
 }
 
+// WriteToFile writes a Mynewt image to a file.
 func (i *Image) WriteToFile(filename string) error {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
-		return util.ChildNewtError(err)
+		return errors.Wrapf(err, "failed to open image destination file")
 	}
 
 	if _, err := i.Write(f); err != nil {
-		return util.ChildNewtError(err)
+		return errors.Wrapf(err, "failed to write image")
 	}
 
 	return nil
 }
 
-func parseRawHeader(imgData []byte, offset int) (ImageHdr, int, error) {
-	var hdr ImageHdr
+// CollectSigs returns a slice of all signatures present in an image's
+// trailer.
+func (img *Image) CollectSigs() ([]sec.Sig, error) {
+	var sigs []sec.Sig
 
-	r := bytes.NewReader(imgData)
-	r.Seek(int64(offset), io.SeekStart)
+	var keyHashTlv *ImageTlv
+	for i, _ := range img.Tlvs {
+		t := &img.Tlvs[i]
 
-	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return hdr, 0, util.FmtNewtError(
-			"Error reading image header: %s", err.Error())
-	}
+		if t.Header.Type == IMAGE_TLV_KEYHASH {
+			if keyHashTlv != nil {
+				return nil, errors.Errorf(
+					"image contains keyhash tlv without subsequent signature")
+			}
+			keyHashTlv = t
+		} else if ImageTlvTypeIsSig(t.Header.Type) {
+			if keyHashTlv == nil {
+				return nil, errors.Errorf(
+					"image contains signature tlv without preceding keyhash")
+			}
 
-	if hdr.Magic != IMAGE_MAGIC {
-		return hdr, 0, util.FmtNewtError(
-			"Image magic incorrect; expected 0x%08x, got 0x%08x",
-			uint32(IMAGE_MAGIC), hdr.Magic)
-	}
+			sigs = append(sigs, sec.Sig{
+				KeyHash: keyHashTlv.Data,
+				Data:    t.Data,
+			})
 
-	remLen := len(imgData) - offset
-	if remLen < int(hdr.HdrSz) {
-		return hdr, 0, util.FmtNewtError(
-			"Image header incomplete; expected %d bytes, got %d bytes",
-			hdr.HdrSz, remLen)
-	}
-
-	return hdr, int(hdr.HdrSz), nil
-}
-
-func parseRawBody(imgData []byte, hdr ImageHdr,
-	offset int) ([]byte, int, error) {
-
-	imgSz := int(hdr.ImgSz)
-	remLen := len(imgData) - offset
-
-	if remLen < imgSz {
-		return nil, 0, util.FmtNewtError(
-			"Image body incomplete; expected %d bytes, got %d bytes",
-			imgSz, remLen)
-	}
-
-	return imgData[offset : offset+imgSz], imgSz, nil
-}
-
-func parseRawTrailer(imgData []byte, offset int) (ImageTrailer, int, error) {
-	var trailer ImageTrailer
-
-	r := bytes.NewReader(imgData)
-	r.Seek(int64(offset), io.SeekStart)
-
-	if err := binary.Read(r, binary.LittleEndian, &trailer); err != nil {
-		return trailer, 0, util.FmtNewtError(
-			"Image contains invalid trailer at offset %d: %s",
-			offset, err.Error())
-	}
-
-	return trailer, IMAGE_TRAILER_SIZE, nil
-}
-
-func parseRawTlv(imgData []byte, offset int) (ImageTlv, int, error) {
-	tlv := ImageTlv{}
-
-	r := bytes.NewReader(imgData)
-	r.Seek(int64(offset), io.SeekStart)
-
-	if err := binary.Read(r, binary.LittleEndian, &tlv.Header); err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Image contains invalid TLV at offset %d: %s", offset, err.Error())
-	}
-
-	tlv.Data = make([]byte, tlv.Header.Len)
-	if _, err := r.Read(tlv.Data); err != nil {
-		return tlv, 0, util.FmtNewtError(
-			"Image contains invalid TLV at offset %d: %s", offset, err.Error())
-	}
-
-	return tlv, IMAGE_TLV_SIZE + int(tlv.Header.Len), nil
-}
-
-func ParseImage(imgData []byte) (Image, error) {
-	img := Image{}
-	offset := 0
-
-	hdr, size, err := parseRawHeader(imgData, offset)
-	if err != nil {
-		return img, err
-	}
-	offset += size
-
-	body, size, err := parseRawBody(imgData, hdr, offset)
-	if err != nil {
-		return img, err
-	}
-	offset += size
-
-	trailer, size, err := parseRawTrailer(imgData, offset)
-	if err != nil {
-		return img, err
-	}
-	offset += size
-
-	var tlvs []ImageTlv
-	tlvLen := IMAGE_TRAILER_SIZE
-	for offset < len(imgData) {
-		tlv, size, err := parseRawTlv(imgData, offset)
-		if err != nil {
-			return img, err
+			keyHashTlv = nil
 		}
-
-		tlvs = append(tlvs, tlv)
-		offset += size
-
-		tlvLen += IMAGE_TLV_SIZE + int(tlv.Header.Len)
 	}
 
-	if int(trailer.TlvTotLen) != tlvLen {
-		return img, util.FmtNewtError(
-			"invalid image: trailer indicates TLV-length=%d; actual=%d",
-			trailer.TlvTotLen, tlvLen)
-	}
-
-	img.Header = hdr
-	img.Body = body
-	img.Tlvs = tlvs
-
-	return img, nil
-}
-
-func ReadImage(filename string) (Image, error) {
-	ri := Image{}
-
-	imgData, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return ri, util.ChildNewtError(err)
-	}
-
-	return ParseImage(imgData)
+	return sigs, nil
 }

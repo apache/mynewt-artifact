@@ -21,39 +21,54 @@ package sec
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"io"
+	"crypto"
+	"crypto/rsa"
 
 	"github.com/apache/mynewt-artifact/errors"
 )
 
-func EncryptAES(plain []byte, secret []byte) ([]byte, error) {
-	block, err := aes.NewCipher(secret)
+type Sig struct {
+	KeyHash []byte
+	Data    []byte
+}
+
+func checkOneKeyOneSig(k PubSignKey, sig Sig, hash []byte) (bool, error) {
+	pubBytes, err := k.Bytes()
 	if err != nil {
-		return nil, errors.Errorf("Failed to create block cipher")
+		return false, errors.WithStack(err)
 	}
-	nonce := make([]byte, 16)
-	stream := cipher.NewCTR(block, nonce)
+	keyHash := RawKeyHash(pubBytes)
 
-	dataBuf := make([]byte, 16)
-	encBuf := make([]byte, 16)
-	r := bytes.NewReader(plain)
-	w := bytes.Buffer{}
-	for {
-		cnt, err := r.Read(dataBuf)
-		if err != nil && err != io.EOF {
-			return nil, errors.Wrapf(err, "Failed to read from plaintext")
-		}
-		if cnt == 0 {
-			break
-		}
-
-		stream.XORKeyStream(encBuf, dataBuf[0:cnt])
-		if _, err = w.Write(encBuf[0:cnt]); err != nil {
-			return nil, errors.Wrapf(err, "failed to write ciphertext")
-		}
+	if !bytes.Equal(keyHash, sig.KeyHash) {
+		return false, nil
 	}
 
-	return w.Bytes(), nil
+	if k.Rsa != nil {
+		opts := rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthEqualsHash,
+		}
+		err := rsa.VerifyPSS(k.Rsa, crypto.SHA256, hash, sig.Data, &opts)
+		return err == nil, nil
+	}
+
+	if k.Ec != nil {
+		return false, errors.Errorf(
+			"ecdsa signature verification not supported")
+	}
+
+	return false, nil
+}
+
+func VerifySigs(key PubSignKey, sigs []Sig, hash []byte) (int, error) {
+	for i, s := range sigs {
+		match, err := checkOneKeyOneSig(key, s, hash)
+		if err != nil {
+			return -1, err
+		}
+		if match {
+			return i, nil
+		}
+	}
+
+	return -1, nil
 }

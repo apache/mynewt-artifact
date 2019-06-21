@@ -20,11 +20,13 @@
 package manifest
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 
-	"mynewt.apache.org/newt/artifact/flash"
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/flash"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 type MfgManifestTarget struct {
@@ -48,7 +50,6 @@ type MfgManifestMeta struct {
 	Hash      bool                 `json:"hash_present"`
 	FlashMap  bool                 `json:"flash_map_present"`
 	Mmrs      []MfgManifestMetaMmr `json:"mmrs,omitempty"`
-	// XXX: refhash
 }
 
 type MfgManifestSig struct {
@@ -66,6 +67,7 @@ type MfgManifest struct {
 	BinPath    string            `json:"bin_path"`
 	HexPath    string            `json:"hex_path"`
 	Bsp        string            `json:"bsp"`
+	EraseVal   byte              `json:"erase_val"`
 	Signatures []MfgManifestSig  `json:"signatures,omitempty"`
 	FlashAreas []flash.FlashArea `json:"flash_map"`
 
@@ -73,29 +75,111 @@ type MfgManifest struct {
 	Meta    *MfgManifestMeta    `json:"meta,omitempty"`
 }
 
-func ReadMfgManifest(path string) (MfgManifest, error) {
-	m := MfgManifest{}
-
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		return m, util.ChildNewtError(err)
+// ReadMfgManifest reads a JSON mfg manifest from a byte slice and produces an
+// MfgManifest object.
+func ParseMfgManifest(jsonText []byte) (MfgManifest, error) {
+	m := MfgManifest{
+		// Backwards compatibility: assume 0xff if unspecified.
+		EraseVal: 0xff,
 	}
 
-	if err := json.Unmarshal(content, &m); err != nil {
-		return m, util.FmtNewtError(
-			"Failure decoding mfg manifest with path \"%s\": %s",
-			path, err.Error())
+	if err := json.Unmarshal(jsonText, &m); err != nil {
+		return m, errors.Wrapf(err, "failure decoding mfg manifest")
 	}
 
 	return m, nil
 }
 
+// ReadMfgManifest reads a JSON mfg manifest from a file and produces an
+// MfgManifest object.
+func ReadMfgManifest(path string) (MfgManifest, error) {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return MfgManifest{}, errors.Wrapf(err,
+			"failed to read mfg manifest file")
+	}
+
+	m, err := ParseMfgManifest(content)
+	if err != nil {
+		return m, errors.Wrapf(err, "path=%s", path)
+	}
+
+	return m, nil
+}
+
+// IsBoot indicates whether an mfg manifest target is a boot loader.
+func (mt *MfgManifestTarget) IsBoot() bool {
+	return mt.BinPath != ""
+}
+
+// MarshalJson produces a JSON representation of an mfg manifest.
 func (m *MfgManifest) MarshalJson() ([]byte, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return nil, util.FmtNewtError(
-			"Cannot encode mfg manifest: %s", err.Error())
+		return nil, errors.Wrapf(err, "cannot encode mfg manifest")
 	}
 
 	return buffer, nil
+}
+
+// FindFlashAreaDevOff searches an mfg manifest for a flash area with the
+// specified device and offset.
+func (m *MfgManifest) FindFlashAreaDevOff(device int, offset int) *flash.FlashArea {
+	for i, _ := range m.FlashAreas {
+		fa := &m.FlashAreas[i]
+		if fa.Device == device && fa.Offset == offset {
+			return fa
+		}
+	}
+
+	return nil
+}
+
+// FindFlashAreaName searches an mfg manifest for a flash area with the
+// specified name.
+func (m *MfgManifest) FindFlashAreaName(name string) *flash.FlashArea {
+	for i, _ := range m.FlashAreas {
+		fa := &m.FlashAreas[i]
+		if fa.Name == name {
+			return fa
+		}
+	}
+
+	return nil
+}
+
+// SecSig converts the provided mfg manifest signature into a sec.Sig object.
+func (ms *MfgManifestSig) SecSig() (sec.Sig, error) {
+	keyHash, err := hex.DecodeString(ms.Key)
+	if err != nil {
+		return sec.Sig{}, errors.Errorf(
+			"invalid hex-encoded key hash: %s", ms.Key)
+	}
+
+	data, err := hex.DecodeString(ms.Sig)
+	if err != nil {
+		return sec.Sig{}, errors.Errorf(
+			"invalid hex-encoded signature: %s", ms.Sig)
+	}
+
+	return sec.Sig{
+		KeyHash: keyHash,
+		Data:    data,
+	}, nil
+}
+
+// SecSigs converts all the signutures in the provided mfg manifest into
+// sec.Sig objects.
+func (m *MfgManifest) SecSigs() ([]sec.Sig, error) {
+	var sigs []sec.Sig
+	for _, ms := range m.Signatures {
+		s, err := ms.SecSig()
+		if err != nil {
+			return nil, err
+		}
+
+		sigs = append(sigs, s)
+	}
+
+	return sigs, nil
 }

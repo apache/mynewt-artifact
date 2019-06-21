@@ -22,7 +22,8 @@ package mfg
 import (
 	"crypto/sha256"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
+	"github.com/apache/mynewt-artifact/flash"
 )
 
 const MFG_BIN_IMG_FILENAME = "mfgimg.bin"
@@ -37,23 +38,9 @@ type Mfg struct {
 	MetaOff int
 }
 
-func Parse(data []byte, metaEndOff int, eraseVal byte) (Mfg, error) {
-	m := Mfg{
-		Bin: data,
-	}
-
-	if metaEndOff >= 0 {
-		meta, _, err := ParseMeta(data[:metaEndOff])
-		if err != nil {
-			return m, err
-		}
-		m.Meta = &meta
-		m.MetaOff = metaEndOff - int(meta.Footer.Size)
-	}
-
-	return m, nil
-}
-
+// StripPadding produces a new byte slice by removing padding from an
+// existing byte slice.  Padding is defined as a sequence of trailing bytes,
+// all with the specified value.
 func StripPadding(b []byte, eraseVal byte) []byte {
 	var pad int
 	for pad = 0; pad < len(b); pad++ {
@@ -66,6 +53,8 @@ func StripPadding(b []byte, eraseVal byte) []byte {
 	return b[:len(b)-pad]
 }
 
+// AddPadding produces a new byte slice by adding extra bytes to the end of
+// an existing slice.
 func AddPadding(b []byte, eraseVal byte, padLen int) []byte {
 	for i := 0; i < padLen; i++ {
 		b = append(b, eraseVal)
@@ -85,52 +74,69 @@ func CalcHash(bin []byte) []byte {
 	return hash[:]
 }
 
-func (m *Mfg) RecalcHash(eraseVal byte) error {
-	if m.Meta == nil || m.Meta.Hash() == nil {
+func (m *Mfg) RecalcHash(eraseVal byte) ([]byte, error) {
+	// The hash TLV needs to be zeroed out in order to calculate the mfg
+	// hash.  Duplicate the mfg object so that we don't modify the
+	// original.
+	dup := m.Clone()
+	if dup.Meta != nil {
+		dup.Meta.ClearHash()
+	}
+
+	bin, err := dup.Bytes(eraseVal)
+	if err != nil {
+		return nil, err
+	}
+
+	return CalcHash(bin), nil
+}
+
+// RefillHash replace's the contents of an mfgimage's SHA256 TLV with a newly
+// calculated hash.
+func (m *Mfg) RefillHash(eraseVal byte) error {
+	if m.Meta == nil {
+		return nil
+	}
+	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
+	if tlv == nil {
 		return nil
 	}
 
-	// First, write with zeroed hash.
-	m.Meta.ClearHash()
-	bin, err := m.Bytes(eraseVal)
+	// Calculate hash.
+	hash, err := m.RecalcHash(eraseVal)
 	if err != nil {
 		return err
 	}
 
-	// Calculate hash and fill TLV.
-	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
-	if tlv != nil {
-		hashData := CalcHash(bin)
-		copy(tlv.Data, hashData)
-
-		hashOff := m.MetaOff + m.Meta.HashOffset()
-		if hashOff+META_HASH_SZ > len(bin) {
-			return util.FmtNewtError(
-				"unexpected error: hash extends beyond end " +
-					"of manufacturing image")
-		}
-	}
+	// Fill hash TLV.
+	copy(tlv.Data, hash)
 
 	return nil
 }
 
-func (m *Mfg) Hash() ([]byte, error) {
+// Hash retrieves the SHA256 value associated with an mfgimage.  If the
+// mfgimage has an MMR with a SHA256 TLV, the TLV's value is returned.
+// Otherwise, the hash is calculated and returned.
+func (m *Mfg) Hash(eraseVal byte) ([]byte, error) {
 	var hashBytes []byte
+
 	if m.Meta != nil {
 		hashBytes = m.Meta.Hash()
 	}
+
 	if hashBytes == nil {
 		// No hash TLV; calculate hash manually.
-		bin, err := m.Bytes(0xff)
+		b, err := m.RecalcHash(eraseVal)
 		if err != nil {
 			return nil, err
 		}
-		hashBytes = CalcHash(bin)
+		hashBytes = b
 	}
 
 	return hashBytes, nil
 }
 
+// Bytes serializes an mfgimage into binary form.
 func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
 	binCopy := make([]byte, len(m.Bin))
 	copy(binCopy, m.Bin)
@@ -148,4 +154,59 @@ func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
 	copy(binCopy[m.MetaOff:m.MetaOff+len(metaBytes)], metaBytes)
 
 	return binCopy, nil
+}
+
+// Clone performs a deep copy of an mfgimage.
+func (m *Mfg) Clone() Mfg {
+	var meta *Meta
+	if m.Meta != nil {
+		metaDup := m.Meta.Clone()
+		meta = &metaDup
+	}
+
+	bin := make([]byte, len(m.Bin))
+	copy(bin, m.Bin)
+
+	return Mfg{
+		Bin:     bin,
+		Meta:    meta,
+		MetaOff: m.MetaOff,
+	}
+}
+
+// ExtractFlashArea copies a portion out of a serialized mfgimage.  The
+// offset and size to copy indicated by the provided FlashArea.
+func (m *Mfg) ExtractFlashArea(area flash.FlashArea,
+	eraseVal byte) ([]byte, error) {
+
+	b, err := m.Bytes(eraseVal)
+	if err != nil {
+		return nil, err
+	}
+
+	if area.Offset >= len(b) {
+		return nil, errors.Errorf(
+			"flash area in mmr (\"%s\") is beyond end of mfgimage "+
+				"(offset=%d mfgimg_len=%d)",
+			area.Name, area.Offset, len(b))
+	}
+
+	// If the end of the target contains unwritten bytes, it gets truncated
+	// from the mfgimage.
+	end := area.Offset + area.Size
+	if end > len(b) {
+		end = len(b)
+	}
+
+	return b[area.Offset:end], nil
+}
+
+// Tlvs retrieves the slice of TLVs present in an mfgimage's MMR.  It returns
+// nil if the mfgimage has no MMR.
+func (m *Mfg) Tlvs() []MetaTlv {
+	if m.Meta == nil {
+		return nil
+	} else {
+		return m.Meta.Tlvs
+	}
 }

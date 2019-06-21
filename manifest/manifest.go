@@ -23,8 +23,9 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"strings"
 
-	"mynewt.apache.org/newt/util"
+	"github.com/apache/mynewt-artifact/errors"
 )
 
 /*
@@ -81,33 +82,47 @@ type Manifest struct {
 	LoaderPkgSizes []*ManifestSizePkg `json:"loader_pkgsz,omitempty"`
 }
 
+// ReadManifest reads a JSON manifest from a file.
 func ReadManifest(path string) (Manifest, error) {
 	m := Manifest{}
 
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		return m, util.ChildNewtError(err)
+		return m, errors.Wrapf(err, "failed to read manifest file")
 	}
 
 	if err := json.Unmarshal(content, &m); err != nil {
-		return m, util.FmtNewtError(
-			"Failure decoding manifest with path \"%s\": %s",
-			path, err.Error())
+		return m, errors.Wrapf(
+			err, "failure decoding manifest with path \"%s\"", path)
 	}
 
 	return m, nil
 }
 
+// Write serializes a manifest as JSON and writes it to the given writer.
 func (m *Manifest) Write(w io.Writer) (int, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
-		return 0, util.FmtNewtError("Cannot encode manifest: %s", err.Error())
+		return 0, errors.Wrapf(err, "Cannot encode manifest")
 	}
 
 	cnt, err := w.Write(buffer)
 	if err != nil {
-		return 0, util.FmtNewtError("Cannot write manifest: %s", err.Error())
+		return 0, errors.Wrapf(err, "Cannot write manifest")
 	}
 
 	return cnt, nil
+}
+
+// FindTargetVar searches a manifest's target definition for a setting with
+// the specified key.  Examples of keys are: "app", "bsp", and "syscfg".
+func (m *Manifest) FindTargetVar(key string) string {
+	for _, tv := range m.TgtVars {
+		parts := strings.SplitN(tv, "=", 2)
+		if len(parts) == 2 && parts[0] == key {
+			return parts[1]
+		}
+	}
+
+	return ""
 }
