@@ -82,6 +82,7 @@ type Manifest struct {
 	LoaderPkgSizes []*ManifestSizePkg `json:"loader_pkgsz,omitempty"`
 }
 
+// ReadManifest reads a JSON manifest from a file.
 func ReadManifest(path string) (Manifest, error) {
 	m := Manifest{}
 
@@ -98,6 +99,7 @@ func ReadManifest(path string) (Manifest, error) {
 	return m, nil
 }
 
+// Write serializes a manifest as JSON and writes it to the given writer.
 func (m *Manifest) Write(w io.Writer) (int, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -112,6 +114,8 @@ func (m *Manifest) Write(w io.Writer) (int, error) {
 	return cnt, nil
 }
 
+// FindTargetVar searches a manifest's target definition for a setting with
+// the specified key.  Examples of keys are: "app", "bsp", and "syscfg".
 func (m *Manifest) FindTargetVar(key string) string {
 	for _, tv := range m.TgtVars {
 		parts := strings.SplitN(tv, "=", 2)

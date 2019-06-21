@@ -105,7 +105,7 @@ func (m *Mfg) validateManMmrs(man manifest.MfgManifest) error {
 
 func (m *Mfg) validateManTargets(man manifest.MfgManifest) error {
 	for _, t := range man.Targets {
-		fa := man.FindFlashArea(man.Device, t.Offset)
+		fa := man.FindFlashAreaDevOff(man.Device, t.Offset)
 		if fa == nil {
 			return errors.Errorf(
 				"no flash area in mfgimage corresponding to target \"%s\"",

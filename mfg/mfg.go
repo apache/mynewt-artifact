@@ -20,7 +20,6 @@
 package mfg
 
 import (
-	"bytes"
 	"crypto/sha256"
 
 	"github.com/apache/mynewt-artifact/errors"
@@ -39,33 +38,9 @@ type Mfg struct {
 	MetaOff int
 }
 
-func Parse(data []byte, metaEndOff int, eraseVal byte) (Mfg, error) {
-	m := Mfg{
-		Bin: data,
-	}
-
-	if metaEndOff >= 0 {
-		if metaEndOff > len(data) {
-			return m, errors.Errorf(
-				"MMR offset (%d) beyond end of mfgimage (%d)",
-				metaEndOff, len(data))
-		}
-
-		meta, _, err := ParseMeta(data[:metaEndOff])
-		if err != nil {
-			return m, err
-		}
-		m.Meta = &meta
-		m.MetaOff = metaEndOff - int(meta.Footer.Size)
-
-		for i := 0; i < int(meta.Footer.Size); i++ {
-			m.Bin[m.MetaOff+i] = eraseVal
-		}
-	}
-
-	return m, nil
-}
-
+// StripPadding produces a new byte slice by removing padding from an
+// existing byte slice.  Padding is defined as a sequence of trailing bytes,
+// all with the specified value.
 func StripPadding(b []byte, eraseVal byte) []byte {
 	var pad int
 	for pad = 0; pad < len(b); pad++ {
@@ -78,6 +53,8 @@ func StripPadding(b []byte, eraseVal byte) []byte {
 	return b[:len(b)-pad]
 }
 
+// AddPadding produces a new byte slice by adding extra bytes to the end of
+// an existing slice.
 func AddPadding(b []byte, eraseVal byte, padLen int) []byte {
 	for i := 0; i < padLen; i++ {
 		b = append(b, eraseVal)
@@ -114,8 +91,10 @@ func (m *Mfg) RecalcHash(eraseVal byte) ([]byte, error) {
 	return CalcHash(bin), nil
 }
 
+// RefillHash replace's the contents of an mfgimage's SHA256 TLV with a newly
+// calculated hash.
 func (m *Mfg) RefillHash(eraseVal byte) error {
-	if m.Meta == nil || m.Meta.Hash() == nil {
+	if m.Meta == nil {
 		return nil
 	}
 	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
@@ -135,6 +114,9 @@ func (m *Mfg) RefillHash(eraseVal byte) error {
 	return nil
 }
 
+// Hash retrieves the SHA256 value associated with an mfgimage.  If the
+// mfgimage has an MMR with a SHA256 TLV, the TLV's value is returned.
+// Otherwise, the hash is calculated and returned.
 func (m *Mfg) Hash(eraseVal byte) ([]byte, error) {
 	var hashBytes []byte
 
@@ -154,21 +136,7 @@ func (m *Mfg) Hash(eraseVal byte) ([]byte, error) {
 	return hashBytes, nil
 }
 
-func (m *Mfg) HashIsValid(eraseVal byte) (bool, error) {
-	// If the mfg doesn't contain a hash TLV, then there is nothing to verify.
-	tlv := m.Meta.FindFirstTlv(META_TLV_TYPE_HASH)
-	if tlv == nil {
-		return true, nil
-	}
-
-	hash, err := m.RecalcHash(eraseVal)
-	if err != nil {
-		return false, err
-	}
-
-	return bytes.Equal(hash, tlv.Data), nil
-}
-
+// Bytes serializes an mfgimage into binary form.
 func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
 	binCopy := make([]byte, len(m.Bin))
 	copy(binCopy, m.Bin)
@@ -188,6 +156,7 @@ func (m *Mfg) Bytes(eraseVal byte) ([]byte, error) {
 	return binCopy, nil
 }
 
+// Clone performs a deep copy of an mfgimage.
 func (m *Mfg) Clone() Mfg {
 	var meta *Meta
 	if m.Meta != nil {
@@ -205,7 +174,11 @@ func (m *Mfg) Clone() Mfg {
 	}
 }
 
-func (m *Mfg) ExtractFlashArea(area flash.FlashArea, eraseVal byte) ([]byte, error) {
+// ExtractFlashArea copies a portion out of a serialized mfgimage.  The
+// offset and size to copy indicated by the provided FlashArea.
+func (m *Mfg) ExtractFlashArea(area flash.FlashArea,
+	eraseVal byte) ([]byte, error) {
+
 	b, err := m.Bytes(eraseVal)
 	if err != nil {
 		return nil, err
@@ -228,6 +201,8 @@ func (m *Mfg) ExtractFlashArea(area flash.FlashArea, eraseVal byte) ([]byte, err
 	return b[area.Offset:end], nil
 }
 
+// Tlvs retrieves the slice of TLVs present in an mfgimage's MMR.  It returns
+// nil if the mfgimage has no MMR.
 func (m *Mfg) Tlvs() []MetaTlv {
 	if m.Meta == nil {
 		return nil

@@ -168,7 +168,7 @@ func (key *SignKey) PubKey() PubSignKey {
 
 func (key *SignKey) PubBytes() ([]byte, error) {
 	pk := key.PubKey()
-	return pk.PubBytes()
+	return pk.Bytes()
 }
 
 func RawKeyHash(pubKeyBytes []byte) []byte {
@@ -256,18 +256,15 @@ func DecryptSecretRsa(privk *rsa.PrivateKey,
 func ParseKeBase64(keyBytes []byte) (cipher.Block, error) {
 	kek, err := base64.StdEncoding.DecodeString(string(keyBytes))
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"Error decoding kek: %s")
+		return nil, errors.Wrapf(err, "error decoding kek")
 	}
 	if len(kek) != 16 {
-		return nil, errors.Errorf(
-			"Unexpected key size: %d != 16", len(kek))
+		return nil, errors.Errorf("unexpected key size: %d != 16", len(kek))
 	}
 
 	cipher, err := aes.NewCipher(kek)
 	if err != nil {
-		return nil, errors.Wrapf(err,
-			"Error creating keywrap cipher")
+		return nil, errors.Wrapf(err, "error creating keywrap cipher")
 	}
 
 	return cipher, nil
@@ -276,7 +273,7 @@ func ParseKeBase64(keyBytes []byte) (cipher.Block, error) {
 func EncryptSecretAes(c cipher.Block, plainSecret []byte) ([]byte, error) {
 	cipherSecret, err := keywrap.Wrap(c, plainSecret)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error key-wrapping")
+		return nil, errors.Wrapf(err, "error key-wrapping")
 	}
 
 	return cipherSecret, nil
@@ -288,14 +285,14 @@ func (key *PubSignKey) AssertValid() {
 	}
 }
 
-func (key *PubSignKey) PubBytes() ([]byte, error) {
+func (key *PubSignKey) Bytes() ([]byte, error) {
 	key.AssertValid()
 
-	var pubBytes []byte
+	var b []byte
 
 	if key.Rsa != nil {
 		var err error
-		pubBytes, err = asn1.Marshal(*key.Rsa)
+		b, err = asn1.Marshal(*key.Rsa)
 		if err != nil {
 			return nil, err
 		}
@@ -304,11 +301,11 @@ func (key *PubSignKey) PubBytes() ([]byte, error) {
 		case "P-224":
 			fallthrough
 		case "P-256":
-			pubBytes, _ = x509.MarshalPKIXPublicKey(*key.Ec)
+			b, _ = x509.MarshalPKIXPublicKey(*key.Ec)
 		default:
 			return nil, errors.Errorf("unsupported ECC curve")
 		}
 	}
 
-	return pubBytes, nil
+	return b, nil
 }

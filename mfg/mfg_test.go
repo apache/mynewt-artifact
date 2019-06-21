@@ -86,7 +86,7 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	err = m.VerifyIntegrity(man.EraseVal)
+	err = m.Verify(man.EraseVal)
 	if !e.integrity {
 		if err == nil {
 			fatalErr("integrity", "good", "bad", nil)
@@ -99,7 +99,7 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	err = m.ValidateManifest(man)
+	err = m.VerifyManifest(man)
 	if !e.man {
 		if err == nil {
 			fatalErr("manifest", "good", "bad", nil)

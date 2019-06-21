@@ -75,6 +75,8 @@ type MfgManifest struct {
 	Meta    *MfgManifestMeta    `json:"meta,omitempty"`
 }
 
+// ReadMfgManifest reads a JSON mfg manifest from a byte slice and produces an
+// MfgManifest object.
 func ParseMfgManifest(jsonText []byte) (MfgManifest, error) {
 	m := MfgManifest{
 		// Backwards compatibility: assume 0xff if unspecified.
@@ -88,6 +90,8 @@ func ParseMfgManifest(jsonText []byte) (MfgManifest, error) {
 	return m, nil
 }
 
+// ReadMfgManifest reads a JSON mfg manifest from a file and produces an
+// MfgManifest object.
 func ReadMfgManifest(path string) (MfgManifest, error) {
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -103,6 +107,12 @@ func ReadMfgManifest(path string) (MfgManifest, error) {
 	return m, nil
 }
 
+// IsBoot indicates whether an mfg manifest target is a boot loader.
+func (mt *MfgManifestTarget) IsBoot() bool {
+	return mt.BinPath != ""
+}
+
+// MarshalJson produces a JSON representation of an mfg manifest.
 func (m *MfgManifest) MarshalJson() ([]byte, error) {
 	buffer, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
@@ -112,7 +122,9 @@ func (m *MfgManifest) MarshalJson() ([]byte, error) {
 	return buffer, nil
 }
 
-func (m *MfgManifest) FindFlashArea(device int, offset int) *flash.FlashArea {
+// FindFlashAreaDevOff searches an mfg manifest for a flash area with the
+// specified device and offset.
+func (m *MfgManifest) FindFlashAreaDevOff(device int, offset int) *flash.FlashArea {
 	for i, _ := range m.FlashAreas {
 		fa := &m.FlashAreas[i]
 		if fa.Device == device && fa.Offset == offset {
@@ -123,6 +135,8 @@ func (m *MfgManifest) FindFlashArea(device int, offset int) *flash.FlashArea {
 	return nil
 }
 
+// FindFlashAreaName searches an mfg manifest for a flash area with the
+// specified name.
 func (m *MfgManifest) FindFlashAreaName(name string) *flash.FlashArea {
 	for i, _ := range m.FlashAreas {
 		fa := &m.FlashAreas[i]
@@ -134,6 +148,7 @@ func (m *MfgManifest) FindFlashAreaName(name string) *flash.FlashArea {
 	return nil
 }
 
+// SecSig converts the provided mfg manifest signature into a sec.Sig object.
 func (ms *MfgManifestSig) SecSig() (sec.Sig, error) {
 	keyHash, err := hex.DecodeString(ms.Key)
 	if err != nil {
@@ -153,6 +168,8 @@ func (ms *MfgManifestSig) SecSig() (sec.Sig, error) {
 	}, nil
 }
 
+// SecSigs converts all the signutures in the provided mfg manifest into
+// sec.Sig objects.
 func (m *MfgManifest) SecSigs() ([]sec.Sig, error) {
 	var sigs []sec.Sig
 	for _, ms := range m.Signatures {
@@ -165,8 +182,4 @@ func (m *MfgManifest) SecSigs() ([]sec.Sig, error) {
 	}
 
 	return sigs, nil
-}
-
-func (mt *MfgManifestTarget) IsBoot() bool {
-	return mt.BinPath != ""
 }

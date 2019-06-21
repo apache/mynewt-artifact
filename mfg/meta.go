@@ -160,6 +160,8 @@ func (tlv *MetaTlv) Write(w io.Writer) (int, error) {
 	return sz, nil
 }
 
+// StructuredBody constructs the appropriate "body" object from a raw TLV
+// (e.g., MetaTlvBodyHash from a TLV with type=META_TLV_TYPE_HASH).
 func (tlv *MetaTlv) StructuredBody() (interface{}, error) {
 	r := bytes.NewReader(tlv.Data)
 
@@ -197,6 +199,8 @@ func (tlv *MetaTlv) StructuredBody() (interface{}, error) {
 	}
 }
 
+// WritePlusOffsets writes a binary MMR to the given writer.  It returns the
+// offsets of the mfgimage components that got written.
 func (meta *Meta) WritePlusOffsets(w io.Writer) (MetaOffsets, error) {
 	mo := MetaOffsets{}
 	sz := 0
@@ -221,11 +225,14 @@ func (meta *Meta) WritePlusOffsets(w io.Writer) (MetaOffsets, error) {
 	return mo, nil
 }
 
+// Offsets returns the offsets of each of an MMR's components if it were
+// serialized.
 func (meta *Meta) Offsets() MetaOffsets {
 	mo, _ := meta.WritePlusOffsets(ioutil.Discard)
 	return mo
 }
 
+// Write serializes and writes an MMR.
 func (meta *Meta) Write(w io.Writer) (int, error) {
 	mo, err := meta.WritePlusOffsets(w)
 	if err != nil {
@@ -235,10 +242,12 @@ func (meta *Meta) Write(w io.Writer) (int, error) {
 	return mo.TotalSize, nil
 }
 
+// Size calculates the total size of an MMR if it were serialied.
 func (meta *Meta) Size() int {
 	return meta.Offsets().TotalSize
 }
 
+// Bytes serializes an MMR to binary form.
 func (meta *Meta) Bytes() ([]byte, error) {
 	b := &bytes.Buffer{}
 
@@ -250,6 +259,8 @@ func (meta *Meta) Bytes() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// FindTlvIndices searches an MMR for TLVs of the specified type and returns
+// their indices.
 func (meta *Meta) FindTlvIndices(typ uint8) []int {
 	indices := []int{}
 
@@ -262,6 +273,7 @@ func (meta *Meta) FindTlvIndices(typ uint8) []int {
 	return indices
 }
 
+// FindTlvIndices searches an MMR for all TLVs of the specified type.
 func (meta *Meta) FindTlvs(typ uint8) []*MetaTlv {
 	indices := meta.FindTlvIndices(typ)
 
@@ -273,15 +285,18 @@ func (meta *Meta) FindTlvs(typ uint8) []*MetaTlv {
 	return tlvs
 }
 
+// FindTlvIndices searches an MMR for the first TLV of the specified type.
 func (meta *Meta) FindFirstTlv(typ uint8) *MetaTlv {
-	indices := meta.FindTlvIndices(typ)
-	if len(indices) == 0 {
+	tlvs := meta.FindTlvs(typ)
+	if len(tlvs) == 0 {
 		return nil
 	}
 
-	return &meta.Tlvs[indices[0]]
+	return tlvs[0]
 }
 
+// HashOffset calculates the offset of the SHA256 TLV in an MMR if it were
+// serialized.
 func (meta *Meta) HashOffset() int {
 	mo := meta.Offsets()
 	indices := meta.FindTlvIndices(META_TLV_TYPE_HASH)
@@ -292,6 +307,7 @@ func (meta *Meta) HashOffset() int {
 	return META_TLV_HEADER_SZ + mo.Tlvs[indices[0]]
 }
 
+// ClearHash zeroes out an MMRs SHA256 TLV.
 func (meta *Meta) ClearHash() {
 	tlv := meta.FindFirstTlv(META_TLV_TYPE_HASH)
 	if tlv != nil {
@@ -299,6 +315,8 @@ func (meta *Meta) ClearHash() {
 	}
 }
 
+// Hash locates an MMR's SHA256 TLV and returns its value.  It returns nil if
+// the MMR doesn't have a SHA256 TLV.
 func (meta *Meta) Hash() []byte {
 	tlv := meta.FindFirstTlv(META_TLV_TYPE_HASH)
 	if tlv == nil {
@@ -307,99 +325,19 @@ func (meta *Meta) Hash() []byte {
 	return tlv.Data
 }
 
+// Clone performs a deep copy of an MMR.
 func (meta *Meta) Clone() Meta {
-	var tlvs []MetaTlv
-	for _, src := range meta.Tlvs {
-		dst := MetaTlv{
+	tlvs := make([]MetaTlv, len(meta.Tlvs))
+	for i, src := range meta.Tlvs {
+		tlvs[i] = MetaTlv{
 			Header: src.Header,
 			Data:   make([]byte, len(src.Data)),
 		}
-		copy(dst.Data, src.Data)
-		tlvs = append(tlvs, dst)
+		copy(tlvs[i].Data, src.Data)
 	}
 
 	return Meta{
 		Tlvs:   tlvs,
 		Footer: meta.Footer,
 	}
-}
-
-func parseMetaTlv(bin []byte) (MetaTlv, int, error) {
-	r := bytes.NewReader(bin)
-
-	tlv := MetaTlv{}
-	if err := binary.Read(r, binary.LittleEndian, &tlv.Header); err != nil {
-		return tlv, 0, errors.Wrapf(err, "error reading TLV header")
-	}
-
-	data := make([]byte, tlv.Header.Size)
-	sz, err := r.Read(data)
-	if err != nil {
-		return tlv, 0, errors.Wrapf(err,
-			"error reading %d bytes of TLV data",
-			tlv.Header.Size)
-	}
-	if sz != len(data) {
-		return tlv, 0, errors.Errorf(
-			"error reading %d bytes of TLV data: incomplete read",
-			tlv.Header.Size)
-	}
-	tlv.Data = data
-
-	return tlv, META_TLV_HEADER_SZ + int(tlv.Header.Size), nil
-}
-
-func parseMetaFooter(bin []byte) (MetaFooter, int, error) {
-	r := bytes.NewReader(bin)
-
-	var ftr MetaFooter
-	if err := binary.Read(r, binary.LittleEndian, &ftr); err != nil {
-		return ftr, 0, errors.Wrapf(err,
-			"error reading meta footer")
-	}
-
-	if ftr.Magic != META_MAGIC {
-		return ftr, 0, errors.Errorf(
-			"meta footer contains invalid magic; exp:0x%08x, got:0x%08x",
-			META_MAGIC, ftr.Magic)
-	}
-
-	return ftr, META_FOOTER_SZ, nil
-}
-
-func ParseMeta(bin []byte) (Meta, int, error) {
-	if len(bin) < META_FOOTER_SZ {
-		return Meta{}, 0, errors.Errorf(
-			"binary too small to accommodate meta footer; "+
-				"bin-size=%d ftr-size=%d", len(bin), META_FOOTER_SZ)
-	}
-
-	ftr, _, err := parseMetaFooter(bin[len(bin)-META_FOOTER_SZ:])
-	if err != nil {
-		return Meta{}, 0, err
-	}
-
-	if int(ftr.Size) > len(bin) {
-		return Meta{}, 0, errors.Errorf(
-			"binary too small to accommodate meta region; "+
-				"bin-size=%d meta-size=%d", len(bin), ftr.Size)
-	}
-
-	ftrOff := len(bin) - META_FOOTER_SZ
-	off := len(bin) - int(ftr.Size)
-
-	tlvs := []MetaTlv{}
-	for off < ftrOff {
-		tlv, sz, err := parseMetaTlv(bin[off:])
-		if err != nil {
-			return Meta{}, 0, err
-		}
-		tlvs = append(tlvs, tlv)
-		off += sz
-	}
-
-	return Meta{
-		Tlvs:   tlvs,
-		Footer: ftr,
-	}, off, nil
 }

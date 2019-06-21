@@ -99,6 +99,10 @@ func SortFlashAreasById(areas []FlashArea) []FlashArea {
 }
 
 func areasDistinct(a FlashArea, b FlashArea) bool {
+	if a.Device != b.Device {
+		return true
+	}
+
 	var lo FlashArea
 	var hi FlashArea
 
@@ -110,7 +114,7 @@ func areasDistinct(a FlashArea, b FlashArea) bool {
 		hi = a
 	}
 
-	return lo.Device != hi.Device || lo.Offset+lo.Size <= hi.Offset
+	return lo.Offset+lo.Size <= hi.Offset
 }
 
 // @return overlapping-areas, id-conflicts.

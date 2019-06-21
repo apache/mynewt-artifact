@@ -78,7 +78,7 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	err = img.VerifyIntegrity()
+	err = img.Verify()
 	if !e.integrity {
 		if err == nil {
 			fatalErr("integrity", "good", "bad", nil)
@@ -93,7 +93,7 @@ func testOne(t *testing.T, e entry) {
 
 	man := readManifest(e.basename)
 
-	err = img.ValidateManifest(man)
+	err = img.VerifyManifest(man)
 	if !e.man {
 		if err == nil {
 			fatalErr("manifest", "good", "bad", nil)

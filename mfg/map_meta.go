@@ -86,6 +86,7 @@ func (b *MetaTlvBodyMmrRef) Map() map[string]interface{} {
 	}
 }
 
+// Map produces a JSON-friendly map representation of an MMR TLV.
 func (t *MetaTlv) Map(index int, offset int) map[string]interface{} {
 	hmap := map[string]interface{}{
 		"_type_name": MetaTlvTypeName(t.Header.Type),
@@ -110,6 +111,7 @@ func (t *MetaTlv) Map(index int, offset int) map[string]interface{} {
 	}
 }
 
+// Map produces a JSON-friendly map representation of an MMR footer.
 func (f *MetaFooter) Map(offset int) map[string]interface{} {
 	return map[string]interface{}{
 		"_offset": offset,
@@ -119,6 +121,7 @@ func (f *MetaFooter) Map(offset int) map[string]interface{} {
 	}
 }
 
+// Map produces a JSON-friendly map representation of an MMR.
 func (m *Meta) Map(endOffset int) map[string]interface{} {
 	offsets := m.Offsets()
 	startOffset := endOffset - int(m.Footer.Size)
@@ -140,6 +143,7 @@ func (m *Meta) Map(endOffset int) map[string]interface{} {
 	}
 }
 
+// Json produces a JSON representation of an MMR.
 func (m *Meta) Json(offset int) (string, error) {
 	mmap := m.Map(offset)
 

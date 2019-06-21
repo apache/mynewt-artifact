@@ -14,7 +14,7 @@ type Sig struct {
 }
 
 func checkOneKeyOneSig(k PubSignKey, sig Sig, hash []byte) (bool, error) {
-	pubBytes, err := k.PubBytes()
+	pubBytes, err := k.Bytes()
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
