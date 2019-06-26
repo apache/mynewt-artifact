@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/apache/mynewt-artifact/errors"
 	"github.com/apache/mynewt-artifact/manifest"
 	"github.com/apache/mynewt-artifact/sec"
 )
@@ -37,6 +38,7 @@ type entry struct {
 	hash      bool
 	man       bool
 	sign      bool
+	encrypted bool
 }
 
 func readImageData(basename string) []byte {
@@ -44,7 +46,7 @@ func readImageData(basename string) []byte {
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		panic("failed to read image file " + path)
+		panic(fmt.Sprintf("failed to read image file \"%s\": %s", path, err.Error()))
 	}
 
 	return data
@@ -55,21 +57,32 @@ func readManifest(basename string) manifest.Manifest {
 
 	man, err := manifest.ReadManifest(path)
 	if err != nil {
-		panic("failed to read manifest file " + path)
+		panic(fmt.Sprintf("failed to read manifest file \"%s\": %s", path, err.Error()))
 	}
 
 	return man
 }
 
-func readPubKey() sec.PubSignKey {
+func readPubSignKey() sec.PubSignKey {
 	path := fmt.Sprintf("%s/sign-key.pem", testdataPath)
 
 	key, err := sec.ReadPrivSignKey(path)
 	if err != nil {
-		panic("failed to read key file " + path)
+		panic(fmt.Sprintf("failed to read key file \"%s\": %s", path, err.Error()))
 	}
 
 	return key.PubKey()
+}
+
+func readPrivEncKey() sec.PrivEncKey {
+	path := fmt.Sprintf("%s/enc-key.der", testdataPath)
+
+	key, err := sec.ReadPrivEncKey(path)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read key file \"%s\": %s", path, err.Error()))
+	}
+
+	return key
 }
 
 func testOne(t *testing.T, e entry) {
@@ -111,7 +124,9 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	_, err = img.VerifyHash(nil)
+	kek := readPrivEncKey()
+
+	kekIdx, err := img.VerifyHash([]sec.PrivEncKey{kek})
 	if !e.hash {
 		if err == nil {
 			fatalErr("hash", "good", "bad", nil)
@@ -120,6 +135,19 @@ func testOne(t *testing.T, e entry) {
 	} else {
 		if err != nil {
 			fatalErr("hash", "bad", "good", err)
+			return
+		}
+
+		var wantKekIdx int
+		if e.encrypted {
+			wantKekIdx = 0
+		} else {
+			wantKekIdx = -1
+		}
+
+		if kekIdx != wantKekIdx {
+			fatalErr("hash", "good", "bad", errors.Errorf(
+				"wrong kek idx: have=%d want=%d", kekIdx, wantKekIdx))
 			return
 		}
 	}
@@ -139,9 +167,9 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	key := readPubKey()
+	isk := readPubSignKey()
 
-	idx, err := img.VerifySigs([]sec.PubSignKey{key})
+	idx, err := img.VerifySigs([]sec.PubSignKey{isk})
 	if !e.sign {
 		if err == nil && idx != -1 {
 			fatalErr("signature", "good", "bad", nil)
@@ -162,6 +190,7 @@ func TestImageVerify(t *testing.T) {
 			structure: false,
 			man:       false,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
 			basename:  "truncated",
@@ -169,6 +198,7 @@ func TestImageVerify(t *testing.T) {
 			structure: false,
 			man:       false,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
 			basename:  "bad-hash",
@@ -177,6 +207,7 @@ func TestImageVerify(t *testing.T) {
 			hash:      false,
 			man:       false,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
 			basename:  "mismatch-hash",
@@ -185,6 +216,7 @@ func TestImageVerify(t *testing.T) {
 			hash:      true,
 			man:       false,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
 			basename:  "mismatch-version",
@@ -193,6 +225,7 @@ func TestImageVerify(t *testing.T) {
 			hash:      true,
 			man:       false,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
 			basename:  "bad-signature",
@@ -201,22 +234,43 @@ func TestImageVerify(t *testing.T) {
 			hash:      true,
 			man:       true,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
-			basename:  "good-unsigned",
+			basename:  "wrong-enc-key",
+			form:      true,
+			structure: true,
+			hash:      false,
+			man:       true,
+			sign:      true,
+			encrypted: true,
+		},
+		entry{
+			basename:  "good-unsigned-unencrypted",
 			form:      true,
 			structure: true,
 			hash:      true,
 			man:       true,
 			sign:      false,
+			encrypted: false,
 		},
 		entry{
-			basename:  "good-signed",
+			basename:  "good-signed-unencrypted",
 			form:      true,
 			structure: true,
 			hash:      true,
 			man:       true,
 			sign:      true,
+			encrypted: false,
+		},
+		entry{
+			basename:  "good-signed-encrypted",
+			form:      true,
+			structure: true,
+			hash:      true,
+			man:       true,
+			sign:      true,
+			encrypted: true,
 		},
 	}
 
