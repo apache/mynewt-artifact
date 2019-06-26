@@ -27,6 +27,7 @@ import (
 	"github.com/apache/mynewt-artifact/flash"
 	"github.com/apache/mynewt-artifact/image"
 	"github.com/apache/mynewt-artifact/manifest"
+	"github.com/apache/mynewt-artifact/sec"
 )
 
 func (m *Mfg) validateManFlashMap(man manifest.MfgManifest) error {
@@ -143,7 +144,7 @@ func (m *Mfg) validateManTargets(man manifest.MfgManifest) error {
 					"error parsing build \"%s\" embedded in mfgimage", t.Name)
 			}
 
-			if err := img.Verify(); err != nil {
+			if err := img.VerifyStructure(); err != nil {
 				return errors.Wrapf(err,
 					"mfgimage contains invalid build \"%s\"", t.Name)
 			}
@@ -153,8 +154,40 @@ func (m *Mfg) validateManTargets(man manifest.MfgManifest) error {
 	return nil
 }
 
-// VerifyManifest compares an mfgimage's structure to its manifest.  It
-// returns an error if the mfgimage doesn't match the manifest.
+// VerifyStructure checks an mfgimage's structure and internal consistency.  It
+// returns an error if the mfgimage is incorrect.
+func (m *Mfg) VerifyStructure(eraseVal byte) error {
+	for _, t := range m.Tlvs() {
+		// Verify that TLV has a valid `type` field.
+		body, err := t.StructuredBody()
+		if err != nil {
+			return err
+		}
+
+		// Verify contents of hash TLV.
+		switch t.Header.Type {
+		case META_TLV_TYPE_HASH:
+			hashBody := body.(*MetaTlvBodyHash)
+
+			hash, err := m.RecalcHash(eraseVal)
+			if err != nil {
+				return err
+			}
+
+			if !bytes.Equal(hash, hashBody.Hash[:]) {
+				return errors.Errorf(
+					"mmr contains incorrect hash: have=%s want=%s",
+					hex.EncodeToString(hashBody.Hash[:]),
+					hex.EncodeToString(hash))
+			}
+		}
+	}
+
+	return nil
+}
+
+// VerifyManifest compares an mfgimage's structure to its manifest.  It returns
+// an error if the mfgimage doesn't match the manifest.
 func (m *Mfg) VerifyManifest(man manifest.MfgManifest) error {
 	if man.Format != 2 {
 		return errors.Errorf(
@@ -188,34 +221,32 @@ func (m *Mfg) VerifyManifest(man manifest.MfgManifest) error {
 	return nil
 }
 
-// Verify checks an mfgimage's structure and internal consistency.  It
-// returns an error if the mfgimage is incorrect.
-func (m *Mfg) Verify(eraseVal byte) error {
-	for _, t := range m.Tlvs() {
-		// Verify that TLV has a valid `type` field.
-		body, err := t.StructuredBody()
+// VerifySigs checks an mfgimage's signatures against the provided set of keys.
+// It succeeds if the mfgimage has no signatures or if any signature can be
+// verified.  An error is returned if there is at least one signature and they
+// all fail the check.
+func VerifySigs(man manifest.MfgManifest, keys []sec.PubSignKey) (int, error) {
+	sigs, err := man.SecSigs()
+	if err != nil {
+		return -1, err
+	}
+
+	hash, err := hex.DecodeString(man.MfgHash)
+	if err != nil {
+		return -1, errors.Wrapf(err,
+			"mfg manifest contains invalid hash: %s", man.MfgHash)
+	}
+
+	for keyIdx, k := range keys {
+		sigIdx, err := sec.VerifySigs(k, sigs, hash)
 		if err != nil {
-			return err
+			return -1, errors.Wrapf(err, "failed to verify mfgimg signatures")
 		}
 
-		// Verify contents of hash TLV.
-		switch t.Header.Type {
-		case META_TLV_TYPE_HASH:
-			hashBody := body.(*MetaTlvBodyHash)
-
-			hash, err := m.RecalcHash(eraseVal)
-			if err != nil {
-				return err
-			}
-
-			if !bytes.Equal(hash, hashBody.Hash[:]) {
-				return errors.Errorf(
-					"mmr contains incorrect hash: have=%s want=%s",
-					hex.EncodeToString(hashBody.Hash[:]),
-					hex.EncodeToString(hash))
-			}
+		if sigIdx != -1 {
+			return keyIdx, nil
 		}
 	}
 
-	return nil
+	return -1, errors.Errorf("mfg signatures do not match provided keys")
 }

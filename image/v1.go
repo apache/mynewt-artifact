@@ -157,7 +157,7 @@ func (img *ImageV1) Write(w io.Writer) (int, error) {
 	return offs.TotalSize, nil
 }
 
-func sigHdrTypeV1(key sec.SignKey) (uint32, error) {
+func sigHdrTypeV1(key sec.PrivSignKey) (uint32, error) {
 	key.AssertValid()
 
 	if key.Rsa != nil {
@@ -178,7 +178,7 @@ func sigHdrTypeV1(key sec.SignKey) (uint32, error) {
 	}
 }
 
-func sigTlvTypeV1(key sec.SignKey) uint8 {
+func sigTlvTypeV1(key sec.PrivSignKey) uint8 {
 	key.AssertValid()
 
 	if key.Rsa != nil {
@@ -216,7 +216,7 @@ func generateV1SigRsa(key *rsa.PrivateKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
-func generateV1SigTlvRsa(key sec.SignKey, hash []byte) (ImageTlv, error) {
+func generateV1SigTlvRsa(key sec.PrivSignKey, hash []byte) (ImageTlv, error) {
 	sig, err := generateV1SigRsa(key.Rsa, hash)
 	if err != nil {
 		return ImageTlv{}, err
@@ -232,7 +232,7 @@ func generateV1SigTlvRsa(key sec.SignKey, hash []byte) (ImageTlv, error) {
 	}, nil
 }
 
-func generateV1SigTlvEc(key sec.SignKey, hash []byte) (ImageTlv, error) {
+func generateV1SigTlvEc(key sec.PrivSignKey, hash []byte) (ImageTlv, error) {
 	sig, err := GenerateSigEc(key, hash)
 	if err != nil {
 		return ImageTlv{}, err
@@ -265,7 +265,7 @@ func generateV1SigTlvEc(key sec.SignKey, hash []byte) (ImageTlv, error) {
 	}, nil
 }
 
-func generateV1SigTlv(key sec.SignKey, hash []byte) (ImageTlv, error) {
+func generateV1SigTlv(key sec.PrivSignKey, hash []byte) (ImageTlv, error) {
 	key.AssertValid()
 
 	if key.Rsa != nil {
@@ -465,7 +465,13 @@ func GenerateV1Image(opts ImageCreateOpts) (ImageV1, error) {
 		if err != nil {
 			return ImageV1{}, errors.Wrapf(err, "error reading pubkey file")
 		}
-		cipherSecret, err := GenerateCipherSecret(pubKeBytes, plainSecret)
+
+		pubKe, err := sec.ParsePubEncKey(pubKeBytes)
+		if err != nil {
+			return ImageV1{}, err
+		}
+
+		cipherSecret, err := pubKe.Encrypt(plainSecret)
 		if err != nil {
 			return ImageV1{}, err
 		}

@@ -38,7 +38,7 @@ import (
 type ImageCreator struct {
 	Body         []byte
 	Version      ImageVersion
-	SigKeys      []sec.SignKey
+	SigKeys      []sec.PrivSignKey
 	PlainSecret  []byte
 	CipherSecret []byte
 	HeaderSize   int
@@ -50,7 +50,7 @@ type ImageCreateOpts struct {
 	SrcBinFilename    string
 	SrcEncKeyFilename string
 	Version           ImageVersion
-	SigKeys           []sec.SignKey
+	SigKeys           []sec.PrivSignKey
 	LoaderHash        []byte
 }
 
@@ -66,7 +66,7 @@ func NewImageCreator() ImageCreator {
 	}
 }
 
-func sigTlvType(key sec.SignKey) uint8 {
+func sigTlvType(key sec.PrivSignKey) uint8 {
 	key.AssertValid()
 
 	if key.Rsa != nil {
@@ -112,7 +112,7 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 	}, nil
 }
 
-func GenerateSigRsa(key sec.SignKey, hash []byte) ([]byte, error) {
+func GenerateSigRsa(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	opts := rsa.PSSOptions{
 		SaltLength: rsa.PSSSaltLengthEqualsHash,
 	}
@@ -125,7 +125,7 @@ func GenerateSigRsa(key sec.SignKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
-func GenerateSigEc(key sec.SignKey, hash []byte) ([]byte, error) {
+func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	r, s, err := ecdsa.Sign(rand.Reader, key.Ec, hash)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to compute signature")
@@ -152,7 +152,7 @@ func GenerateSigEc(key sec.SignKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
-func GenerateSig(key sec.SignKey, hash []byte) ([]byte, error) {
+func GenerateSig(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	key.AssertValid()
 
 	if key.Rsa != nil {
@@ -174,7 +174,7 @@ func BuildKeyHashTlv(keyBytes []byte) ImageTlv {
 	}
 }
 
-func BuildSigTlvs(keys []sec.SignKey, hash []byte) ([]ImageTlv, error) {
+func BuildSigTlvs(keys []sec.PrivSignKey, hash []byte) ([]ImageTlv, error) {
 	var tlvs []ImageTlv
 
 	for _, key := range keys {
@@ -215,30 +215,6 @@ func GeneratePlainSecret() ([]byte, error) {
 	return plainSecret, nil
 }
 
-func GenerateCipherSecret(pubKeBytes []byte,
-	plainSecret []byte) ([]byte, error) {
-
-	// Try reading as PEM (asymetric key).
-	rsaPubKe, err := sec.ParsePubKePem(pubKeBytes)
-	if err != nil {
-		return nil, err
-	}
-	if rsaPubKe != nil {
-		return sec.EncryptSecretRsa(rsaPubKe, plainSecret)
-	}
-
-	// Not PEM; assume this is a base64 encoded symetric key
-	aesPubKe, err := sec.ParseKeBase64(pubKeBytes)
-	if err != nil {
-		return nil, err
-	}
-	if aesPubKe != nil {
-		return sec.EncryptSecretAes(aesPubKe, plainSecret)
-	}
-
-	return nil, errors.Errorf("invalid image-crypt key")
-}
-
 func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic := NewImageCreator()
 
@@ -269,7 +245,12 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 			return Image{}, errors.Wrapf(err, "error reading pubkey file")
 		}
 
-		cipherSecret, err := GenerateCipherSecret(pubKeBytes, plainSecret)
+		pubKe, err := sec.ParsePubEncKey(pubKeBytes)
+		if err != nil {
+			return Image{}, err
+		}
+
+		cipherSecret, err := pubKe.Encrypt(plainSecret)
 		if err != nil {
 			return Image{}, err
 		}

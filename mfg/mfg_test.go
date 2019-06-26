@@ -33,7 +33,7 @@ const testdataPath = "testdata"
 type entry struct {
 	basename  string
 	form      bool
-	integrity bool
+	structure bool
 	man       bool
 	sign      bool
 }
@@ -63,7 +63,7 @@ func readManifest(basename string) manifest.MfgManifest {
 func readPubKey() sec.PubSignKey {
 	path := fmt.Sprintf("%s/sign-key.pem", testdataPath)
 
-	key, err := sec.ReadKey(path)
+	key, err := sec.ReadPrivSignKey(path)
 	if err != nil {
 		panic("failed to read key file " + path)
 	}
@@ -105,15 +105,15 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	err = m.Verify(man.EraseVal)
-	if !e.integrity {
+	err = m.VerifyStructure(man.EraseVal)
+	if !e.structure {
 		if err == nil {
-			fatalErr("integrity", "good", "bad", nil)
+			fatalErr("structure", "good", "bad", nil)
 		}
 		return
 	} else {
 		if err != nil {
-			fatalErr("integrity", "bad", "good", err)
+			fatalErr("structure", "bad", "good", err)
 			return
 		}
 	}
@@ -133,19 +133,7 @@ func testOne(t *testing.T, e entry) {
 
 	key := readPubKey()
 
-	sigs, err := man.SecSigs()
-	if err != nil {
-		t.Fatalf("failed to collect mfg signatures: %s", err.Error())
-		return
-	}
-
-	hash, err := m.Hash(man.EraseVal)
-	if err != nil {
-		t.Fatalf("failed to read mfg hash: %s", err.Error())
-		return
-	}
-
-	idx, err := sec.VerifySigs(key, sigs, hash)
+	idx, err := VerifySigs(man, []sec.PubSignKey{key})
 	if !e.sign {
 		if err == nil && idx != -1 {
 			fatalErr("signature", "good", "bad", nil)
@@ -164,7 +152,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "garbage",
 			form:      false,
-			integrity: false,
+			structure: false,
 			man:       false,
 			sign:      false,
 		},
@@ -172,7 +160,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "unknown-tlv",
 			form:      true,
-			integrity: false,
+			structure: false,
 			man:       false,
 			sign:      false,
 		},
@@ -180,7 +168,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hashx-fm1-ext0-tgts1-sign0",
 			form:      true,
-			integrity: false,
+			structure: false,
 			man:       false,
 			sign:      false,
 		},
@@ -188,7 +176,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hashm-fm1-ext0-tgts1-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       false,
 			sign:      false,
 		},
@@ -196,7 +184,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fmm-ext1-tgts1-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       false,
 			sign:      false,
 		},
@@ -204,7 +192,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fm1-extm-tgts1-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       false,
 			sign:      false,
 		},
@@ -212,7 +200,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fm1-ext1-tgtsm-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       false,
 			sign:      false,
 		},
@@ -220,7 +208,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fm1-ext0-tgts1-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       true,
 			sign:      false,
 		},
@@ -228,7 +216,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fm1-ext1-tgts1-sign0",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       true,
 			sign:      false,
 		},
@@ -236,7 +224,7 @@ func TestMfgVerify(t *testing.T) {
 		entry{
 			basename:  "hash1-fm1-ext1-tgts1-sign1",
 			form:      true,
-			integrity: true,
+			structure: true,
 			man:       true,
 			sign:      true,
 		},
