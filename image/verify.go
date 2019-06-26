@@ -25,7 +25,149 @@ import (
 
 	"github.com/apache/mynewt-artifact/errors"
 	"github.com/apache/mynewt-artifact/manifest"
+	"github.com/apache/mynewt-artifact/sec"
 )
+
+func (img *Image) verifyHashDecrypted() error {
+	// Verify the hash.
+	haveHash, err := img.Hash()
+	if err != nil {
+		return err
+	}
+
+	wantHash, err := img.CalcHash()
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(haveHash, wantHash) {
+		return errors.Errorf(
+			"image contains incorrect hash: have=%x want=%x",
+			haveHash, wantHash)
+	}
+
+	return nil
+}
+
+func (img *Image) verifyEncState() ([]byte, error) {
+	secret, err := img.CollectSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	if img.Header.Flags&IMAGE_F_ENCRYPTED == 0 {
+		if secret != nil {
+			return nil, errors.Errorf(
+				"encrypted flag set in image header, but no encryption TLV")
+		}
+
+		return nil, nil
+	} else {
+		if secret == nil {
+			return nil, errors.Errorf(
+				"encryption TLV, but encrypted flag unset in image header")
+		}
+
+		return secret, nil
+	}
+}
+
+// VerifyStructure checks an image's structure for internal consistency.  It
+// returns an error if the image is incorrect.
+func (img *Image) VerifyStructure() error {
+	// Verify that each TLV has a valid "type" field.
+	for _, t := range img.Tlvs {
+		if !ImageTlvTypeIsValid(t.Header.Type) {
+			return errors.Errorf(
+				"image contains TLV with invalid `type` field: %d",
+				t.Header.Type)
+		}
+	}
+
+	if _, err := img.verifyEncState(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// VerifyHash calculates an image's hash and compares it to the image's SHA256
+// TLV.  If the image is encrypted, this function temporarily decrypts it
+// before calculating the hash.  The returned int is the index of the key that
+// was used to decrypt the image, or -1 if none.  An error is returned if the
+// hash is incorrect.
+func (img *Image) VerifyHash(privEncKeys []sec.PrivEncKey) (int, error) {
+	secret, err := img.verifyEncState()
+	if err != nil {
+		return -1, err
+	}
+
+	if secret == nil {
+		// Image not encrypted.
+		if err := img.verifyHashDecrypted(); err != nil {
+			return -1, err
+		}
+
+		return -1, nil
+	}
+
+	// Image is encrypted.
+	if len(privEncKeys) == 0 {
+		return -1, errors.Errorf(
+			"attempt to verify hash of encrypted image: no keys provided")
+	}
+
+	// We don't know which key the image is encrypted with.  For each key,
+	// decrypt and then check the hash.
+	var hashErr error
+	for i, key := range privEncKeys {
+		dec, err := Decrypt(*img, key)
+		if err != nil {
+			return -1, err
+		}
+
+		hashErr = dec.verifyHashDecrypted()
+		if hashErr == nil {
+			return i, nil
+		}
+	}
+
+	return -1, hashErr
+}
+
+// VerifySigs checks an image's attached signatures against the provided set of
+// keys.  It succeeds if the image has no signatures or if any signature can be
+// verified.  The returned int is the index of the key that was used to verify
+// a signature, or -1 if none.  An error is returned if there is at least one
+// signature and they all fail the check.
+func (img *Image) VerifySigs(keys []sec.PubSignKey) (int, error) {
+	sigs, err := img.CollectSigs()
+	if err != nil {
+		return -1, err
+	}
+
+	if len(sigs) == 0 {
+		return -1, nil
+	}
+
+	hash, err := img.Hash()
+	if err != nil {
+		return -1, err
+	}
+
+	for _, k := range keys {
+		idx, err := sec.VerifySigs(k, sigs, hash)
+		if err != nil {
+			return -1, err
+		}
+
+		if idx != -1 {
+			return idx, nil
+		}
+	}
+
+	return -1, errors.Errorf("image signatures do not match provided keys")
+}
 
 // VerifyManifest compares an image's structure to its manifest.  It returns
 // an error if the image doesn't match the manifest.
@@ -67,39 +209,6 @@ func (img *Image) VerifyManifest(man manifest.Manifest) error {
 	}
 	if err := checkHash(man.ImageHash); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-// Verify checks an image's structure and internal consistency.  It returns
-// an error if the image is incorrect.
-func (img *Image) Verify() error {
-	// Verify the hash.
-
-	haveHash, err := img.Hash()
-	if err != nil {
-		return err
-	}
-
-	wantHash, err := img.CalcHash()
-	if err != nil {
-		return err
-	}
-
-	if !bytes.Equal(haveHash, wantHash) {
-		return errors.Errorf(
-			"image manifest contains incorrect hash: have=%x want=%x",
-			haveHash, wantHash)
-	}
-
-	// Verify that each TLV has a valid "type" field.
-	for _, t := range img.Tlvs {
-		if !ImageTlvTypeIsValid(t.Header.Type) {
-			return errors.Errorf(
-				"image contains TLV with invalid `type` field: %d",
-				t.Header.Type)
-		}
 	}
 
 	return nil

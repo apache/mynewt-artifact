@@ -69,7 +69,7 @@ func signatureTest(t *testing.T, privateKey []byte) {
 	}
 
 	// Now try with a signature.
-	key, err := sec.BuildPrivateKey(privateKey)
+	key, err := sec.ParsePrivSignKey(privateKey)
 	if err != nil {
 		t.Fatal(err)
 	}

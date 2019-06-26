@@ -145,9 +145,21 @@ func ImageTlvTypeIsSig(tlvType uint8) bool {
 		tlvType == IMAGE_TLV_ECDSA256
 }
 
+func ImageTlvTypeIsSecret(tlvType uint8) bool {
+	return tlvType == IMAGE_TLV_ENC_RSA ||
+		tlvType == IMAGE_TLV_ENC_KEK
+}
+
 func (ver ImageVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d.%d",
 		ver.Major, ver.Minor, ver.Rev, ver.BuildNum)
+}
+
+func (tlv *ImageTlv) Clone() ImageTlv {
+	return ImageTlv{
+		Header: tlv.Header,
+		Data:   append([]byte(nil), tlv.Data...),
+	}
 }
 
 func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
@@ -168,13 +180,29 @@ func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
 	return totalSize, nil
 }
 
-// FindTlvIndices searches an image for TLVs of the specified type and
-// returns their indices.
-func (i *Image) FindTlvIndices(tlvType uint8) []int {
+// Clone performs a deep copy of an image.
+func (img *Image) Clone() Image {
+	dup := Image{
+		Header: img.Header,
+		Pad:    append([]byte(nil), img.Pad...),
+		Body:   append([]byte(nil), img.Body...),
+		Tlvs:   make([]ImageTlv, len(img.Tlvs)),
+	}
+
+	for i, tlv := range img.Tlvs {
+		dup.Tlvs[i] = tlv.Clone()
+	}
+
+	return dup
+}
+
+// FindTlvIndicesIf searches an image for TLVs satisfying the given predicate
+// and returns their indices.
+func (img *Image) FindTlvIndicesIf(pred func(tlv ImageTlv) bool) []int {
 	var idxs []int
 
-	for i, tlv := range i.Tlvs {
-		if tlv.Header.Type == tlvType {
+	for i, tlv := range img.Tlvs {
+		if pred(tlv) {
 			idxs = append(idxs, i)
 		}
 	}
@@ -182,13 +210,34 @@ func (i *Image) FindTlvIndices(tlvType uint8) []int {
 	return idxs
 }
 
-// FindTlvs retrieves all TLVs in an image's footer with the specified type.
-func (i *Image) FindTlvs(tlvType uint8) []*ImageTlv {
+// FindTlvIndices searches an image for TLVs of the specified type and
+// returns their indices.
+func (img *Image) FindTlvIndices(tlvType uint8) []int {
+	return img.FindTlvIndicesIf(func(tlv ImageTlv) bool {
+		return tlv.Header.Type == tlvType
+	})
+}
+
+// FindTlvIndices searches an image for TLVs satisfying the given predicate and
+// returns them.
+func (img *Image) FindTlvsIf(pred func(tlv ImageTlv) bool) []*ImageTlv {
 	var tlvs []*ImageTlv
 
-	idxs := i.FindTlvIndices(tlvType)
+	idxs := img.FindTlvIndicesIf(pred)
 	for _, idx := range idxs {
-		tlvs = append(tlvs, &i.Tlvs[idx])
+		tlvs = append(tlvs, &img.Tlvs[idx])
+	}
+
+	return tlvs
+}
+
+// FindTlvs retrieves all TLVs in an image's footer with the specified type.
+func (img *Image) FindTlvs(tlvType uint8) []*ImageTlv {
+	var tlvs []*ImageTlv
+
+	idxs := img.FindTlvIndices(tlvType)
+	for _, idx := range idxs {
+		tlvs = append(tlvs, &img.Tlvs[idx])
 	}
 
 	return tlvs
@@ -387,4 +436,109 @@ func (img *Image) CollectSigs() ([]sec.Sig, error) {
 	}
 
 	return sigs, nil
+}
+
+// CollectSecret finds the "secret" TLV in an image and returns its body.  It
+// returns nil if there is no "secret" TLV.
+func (img *Image) CollectSecret() ([]byte, error) {
+	tlv, err := img.FindUniqueTlv(IMAGE_TLV_ENC_RSA)
+	if err != nil {
+		return nil, err
+	}
+
+	if tlv == nil {
+		return nil, nil
+	}
+
+	return tlv.Data, nil
+}
+
+// ExtractSecret finds the "secret" TLV in an image, removes it, and returns
+// its body.  It returns nil if there is no "secret" TLV.
+func (img *Image) ExtractSecret() ([]byte, error) {
+	tlvs := img.RemoveTlvsWithType(IMAGE_TLV_ENC_RSA)
+
+	if len(tlvs) == 0 {
+		return nil, nil
+	}
+
+	if len(tlvs) > 1 {
+		return nil, errors.Errorf(
+			"image contains >1 ENC_RSA TLVs (%d)", len(tlvs))
+	}
+
+	return tlvs[0].Data, nil
+}
+
+// Encrypt encrypts an image body and adds a "secret" TLV.  It does NOT set the
+// "encrypted" flag in the image header.
+func Encrypt(img Image, pubEncKey sec.PubEncKey) (Image, error) {
+	dup := img.Clone()
+
+	tlvp, err := dup.FindUniqueTlv(IMAGE_TLV_ENC_RSA)
+	if err != nil {
+		return dup, err
+	}
+	if tlvp != nil {
+		return dup, errors.Errorf("image already contains an ENC_RSA TLV")
+	}
+
+	plainSecret, err := GeneratePlainSecret()
+	if err != nil {
+		return dup, err
+	}
+
+	cipherSecret, err := pubEncKey.Encrypt(plainSecret)
+	if err != nil {
+		return dup, err
+	}
+
+	body, err := sec.EncryptAES(dup.Body, plainSecret)
+	if err != nil {
+		return dup, err
+	}
+	dup.Body = body
+
+	tlv, err := GenerateEncTlv(cipherSecret)
+	if err != nil {
+		return dup, err
+	}
+	dup.Tlvs = append(dup.Tlvs, tlv)
+
+	return dup, nil
+}
+
+// Decrypt decrypts an image body and strips the "secret" TLV.  It does NOT
+// clear the "encrypted" flag in the image header.
+func Decrypt(img Image, privEncKey sec.PrivEncKey) (Image, error) {
+	dup := img.Clone()
+
+	tlvs := dup.RemoveTlvsIf(func(tlv ImageTlv) bool {
+		return ImageTlvTypeIsSecret(tlv.Header.Type)
+	})
+	if len(tlvs) != 1 {
+		return dup, errors.Errorf(
+			"failed to decrypt image: wrong count of \"secret\" TLVs; "+
+				"have=%d want=1", len(tlvs))
+	}
+
+	cipherSecret := tlvs[0].Data
+	plainSecret, err := privEncKey.Decrypt(cipherSecret)
+	if err != nil {
+		return img, err
+	}
+
+	body, err := sec.EncryptAES(dup.Body, plainSecret)
+	if err != nil {
+		return img, err
+	}
+
+	dup.Body = body
+
+	return dup, nil
+}
+
+// IsEncrypted indicates whether an image's "encrypted" flag is set.
+func (img *Image) IsEncrypted() bool {
+	return img.Header.Flags&IMAGE_F_ENCRYPTED != 0
 }

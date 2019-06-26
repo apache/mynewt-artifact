@@ -33,7 +33,8 @@ const testdataPath = "testdata"
 type entry struct {
 	basename  string
 	form      bool
-	integrity bool
+	structure bool
+	hash      bool
 	man       bool
 	sign      bool
 }
@@ -63,7 +64,7 @@ func readManifest(basename string) manifest.Manifest {
 func readPubKey() sec.PubSignKey {
 	path := fmt.Sprintf("%s/sign-key.pem", testdataPath)
 
-	key, err := sec.ReadKey(path)
+	key, err := sec.ReadPrivSignKey(path)
 	if err != nil {
 		panic("failed to read key file " + path)
 	}
@@ -97,15 +98,28 @@ func testOne(t *testing.T, e entry) {
 		}
 	}
 
-	err = img.Verify()
-	if !e.integrity {
+	err = img.VerifyStructure()
+	if !e.structure {
 		if err == nil {
-			fatalErr("integrity", "good", "bad", nil)
+			fatalErr("structure", "good", "bad", nil)
 		}
 		return
 	} else {
 		if err != nil {
-			fatalErr("integrity", "bad", "good", err)
+			fatalErr("structure", "bad", "good", err)
+			return
+		}
+	}
+
+	_, err = img.VerifyHash(nil)
+	if !e.hash {
+		if err == nil {
+			fatalErr("hash", "good", "bad", nil)
+		}
+		return
+	} else {
+		if err != nil {
+			fatalErr("hash", "bad", "good", err)
 			return
 		}
 	}
@@ -127,19 +141,7 @@ func testOne(t *testing.T, e entry) {
 
 	key := readPubKey()
 
-	sigs, err := img.CollectSigs()
-	if err != nil {
-		t.Fatalf("failed to collect image signatures: %s", err.Error())
-		return
-	}
-
-	hash, err := img.Hash()
-	if err != nil {
-		t.Fatalf("failed to read image hash: %s", err.Error())
-		return
-	}
-
-	idx, err := sec.VerifySigs(key, sigs, hash)
+	idx, err := img.VerifySigs([]sec.PubSignKey{key})
 	if !e.sign {
 		if err == nil && idx != -1 {
 			fatalErr("signature", "good", "bad", nil)
@@ -157,56 +159,62 @@ func TestImageVerify(t *testing.T) {
 		entry{
 			basename:  "garbage",
 			form:      false,
-			integrity: false,
+			structure: false,
 			man:       false,
 			sign:      false,
 		},
 		entry{
 			basename:  "truncated",
 			form:      false,
-			integrity: false,
+			structure: false,
 			man:       false,
 			sign:      false,
 		},
 		entry{
 			basename:  "bad-hash",
 			form:      true,
-			integrity: false,
+			structure: true,
+			hash:      false,
 			man:       false,
 			sign:      false,
 		},
 		entry{
 			basename:  "mismatch-hash",
 			form:      true,
-			integrity: true,
+			structure: true,
+			hash:      true,
 			man:       false,
 			sign:      false,
 		},
 		entry{
 			basename:  "mismatch-version",
 			form:      true,
-			integrity: true,
+			structure: true,
+			hash:      true,
 			man:       false,
 			sign:      false,
 		},
 		entry{
 			basename:  "bad-signature",
 			form:      true,
-			integrity: true,
+			structure: true,
+			hash:      true,
 			man:       true,
 			sign:      false,
 		},
 		entry{
 			basename:  "good-unsigned",
 			form:      true,
-			integrity: true,
+			structure: true,
+			hash:      true,
 			man:       true,
 			sign:      false,
 		},
 		entry{
 			basename:  "good-signed",
 			form:      true,
-			integrity: true,
+			structure: true,
+			hash:      true,
 			man:       true,
 			sign:      true,
 		},
