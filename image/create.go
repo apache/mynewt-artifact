@@ -33,6 +33,7 @@ import (
 
 	"github.com/apache/mynewt-artifact/errors"
 	"github.com/apache/mynewt-artifact/sec"
+	"golang.org/x/crypto/ed25519"
 )
 
 type ImageCreator struct {
@@ -79,7 +80,7 @@ func sigTlvType(key sec.PrivSignKey) uint8 {
 		default:
 			return 0
 		}
-	} else {
+	} else if key.Ec != nil {
 		switch key.Ec.Curve.Params().Name {
 		case "P-224":
 			return IMAGE_TLV_ECDSA224
@@ -88,6 +89,8 @@ func sigTlvType(key sec.PrivSignKey) uint8 {
 		default:
 			return 0
 		}
+	} else {
+		return IMAGE_TLV_ED25519
 	}
 }
 
@@ -152,13 +155,27 @@ func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
+func GenerateSigEd25519(key sec.PrivSignKey, hash []byte) ([]byte, error) {
+	sig := ed25519.Sign(*key.Ed25519, hash)
+
+	if len(sig) != ed25519.SignatureSize {
+		return nil, errors.Errorf(
+			"ed25519 signature has wrong length: have=%d want=%d",
+			len(sig), ed25519.SignatureSize)
+	}
+
+	return sig, nil
+}
+
 func GenerateSig(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	key.AssertValid()
 
 	if key.Rsa != nil {
 		return GenerateSigRsa(key, hash)
-	} else {
+	} else if key.Ec != nil {
 		return GenerateSigEc(key, hash)
+	} else {
+		return GenerateSigEd25519(key, hash)
 	}
 }
 
