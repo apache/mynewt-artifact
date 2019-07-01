@@ -24,6 +24,8 @@ import (
 
 	"github.com/apache/mynewt-artifact/errors"
 	"github.com/apache/mynewt-artifact/flash"
+	"github.com/apache/mynewt-artifact/image"
+	"github.com/apache/mynewt-artifact/manifest"
 )
 
 const MFG_BIN_IMG_FILENAME = "mfgimg.bin"
@@ -209,4 +211,43 @@ func (m *Mfg) Tlvs() []MetaTlv {
 	} else {
 		return m.Meta.Tlvs
 	}
+}
+
+func (m *Mfg) extractImage(area flash.FlashArea, eraseVal byte) (image.Image, error) {
+	bin, err := m.ExtractFlashArea(area, eraseVal)
+	if err != nil {
+		return image.Image{}, err
+	}
+
+	img, err := image.ParseImage(bin)
+	if err != nil {
+		return image.Image{}, errors.Wrapf(err,
+			"failed to extract image from mfgimage; area=\"%s\"", area.Name)
+	}
+
+	return img, nil
+}
+
+// Constructs the set of images embedded in an mfgimage.
+func (m *Mfg) ExtractImages(man manifest.MfgManifest) ([]image.Image, error) {
+	var imgs []image.Image
+	for _, t := range man.Targets {
+		fa := man.FindFlashAreaDevOff(man.Device, t.Offset)
+		if fa == nil {
+			return nil, errors.Errorf(
+				"no flash area in mfgimage corresponding to target \"%s\"",
+				t.Name)
+		}
+
+		if !t.IsBoot() {
+			img, err := m.extractImage(*fa, man.EraseVal)
+			if err != nil {
+				return nil, err
+			}
+
+			imgs = append(imgs, img)
+		}
+	}
+
+	return imgs, nil
 }

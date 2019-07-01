@@ -25,7 +25,6 @@ import (
 
 	"github.com/apache/mynewt-artifact/errors"
 	"github.com/apache/mynewt-artifact/flash"
-	"github.com/apache/mynewt-artifact/image"
 	"github.com/apache/mynewt-artifact/manifest"
 	"github.com/apache/mynewt-artifact/sec"
 )
@@ -123,37 +122,6 @@ func (m *Mfg) validateManMmrs(man manifest.MfgManifest) error {
 	return nil
 }
 
-func (m *Mfg) validateManTargets(man manifest.MfgManifest) error {
-	for _, t := range man.Targets {
-		fa := man.FindFlashAreaDevOff(man.Device, t.Offset)
-		if fa == nil {
-			return errors.Errorf(
-				"no flash area in mfgimage corresponding to target \"%s\"",
-				t.Name)
-		}
-
-		data, err := m.ExtractFlashArea(*fa, man.EraseVal)
-		if err != nil {
-			return err
-		}
-
-		if !t.IsBoot() {
-			img, err := image.ParseImage(data)
-			if err != nil {
-				return errors.Wrapf(err,
-					"error parsing build \"%s\" embedded in mfgimage", t.Name)
-			}
-
-			if err := img.VerifyStructure(); err != nil {
-				return errors.Wrapf(err,
-					"mfgimage contains invalid build \"%s\"", t.Name)
-			}
-		}
-	}
-
-	return nil
-}
-
 // VerifyStructure checks an mfgimage's structure and internal consistency.  It
 // returns an error if the mfgimage is incorrect.
 func (m *Mfg) VerifyStructure(eraseVal byte) error {
@@ -213,9 +181,13 @@ func (m *Mfg) VerifyManifest(man manifest.MfgManifest) error {
 		return err
 	}
 
-	// Verify each embedded build.
-	if err := m.validateManTargets(man); err != nil {
-		return err
+	// Make sure each target is fully present.
+	for _, t := range man.Targets {
+		if man.FindFlashAreaDevOff(man.Device, t.Offset) == nil {
+			return errors.Errorf(
+				"no flash area in mfgimage corresponding to target \"%s\"",
+				t.Name)
+		}
 	}
 
 	return nil
