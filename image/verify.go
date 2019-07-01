@@ -155,14 +155,14 @@ func (img *Image) VerifySigs(keys []sec.PubSignKey) (int, error) {
 		return -1, err
 	}
 
-	for _, k := range keys {
-		idx, err := sec.VerifySigs(k, sigs, hash)
+	for keyIdx, k := range keys {
+		sigIdx, err := sec.VerifySigs(k, sigs, hash)
 		if err != nil {
 			return -1, err
 		}
 
-		if idx != -1 {
-			return idx, nil
+		if sigIdx != -1 {
+			return keyIdx, nil
 		}
 	}
 
