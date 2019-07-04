@@ -26,8 +26,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/base64"
 	"io"
 
 	keywrap "github.com/NickBall/go-aes-key-wrap"
@@ -81,13 +79,24 @@ func parsePubKeBase64(keyBytes []byte) (PubEncKey, error) {
 }
 
 func ParsePubEncKey(keyBytes []byte) (PubEncKey, error) {
-	b, err := base64.StdEncoding.DecodeString(string(keyBytes))
-	if err == nil {
-		return parsePubKeBase64(b)
+	itf, err := parsePubKey(keyBytes)
+	if err != nil {
+		return PubEncKey{}, err
 	}
 
-	// Not base64-encoded; assume it is PEM.
-	return parsePubKePem(keyBytes)
+	key := PubEncKey{}
+
+	switch pub := itf.(type) {
+	case *rsa.PublicKey:
+		key.Rsa = pub
+	case cipher.Block:
+		key.Aes = pub
+	default:
+		return key, errors.Errorf(
+			"unknown public encryption key type: %T", pub)
+	}
+
+	return key, nil
 }
 
 func (key *PubEncKey) AssertValid() {
@@ -127,14 +136,20 @@ func (k *PubEncKey) Encrypt(plain []byte) ([]byte, error) {
 }
 
 func ParsePrivEncKey(keyBytes []byte) (PrivEncKey, error) {
-	rpk, err := x509.ParsePKCS1PrivateKey(keyBytes)
+	itf, err := parsePrivKey(keyBytes)
 	if err != nil {
 		return PrivEncKey{}, errors.Wrapf(err, "error parsing private key file")
 	}
 
-	return PrivEncKey{
-		Rsa: rpk,
-	}, nil
+	key := PrivEncKey{}
+	switch priv := itf.(type) {
+	case *rsa.PrivateKey:
+		key.Rsa = priv
+	default:
+		return key, errors.Errorf("unknown private enc key type: %T", itf)
+	}
+
+	return key, nil
 }
 
 func decryptRsa(privk *rsa.PrivateKey, ciph []byte) ([]byte, error) {

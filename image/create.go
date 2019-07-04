@@ -156,7 +156,7 @@ func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 }
 
 func GenerateSigEd25519(key sec.PrivSignKey, hash []byte) ([]byte, error) {
-	sig := ed25519.Sign(*key.Ed25519, hash)
+	sig := ed25519.Sign(key.Ed25519, hash)
 
 	if len(sig) != ed25519.SignatureSize {
 		return nil, errors.Errorf(

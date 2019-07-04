@@ -27,7 +27,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/pem"
 
 	"github.com/apache/mynewt-artifact/errors"
 	"golang.org/x/crypto/ed25519"
@@ -37,10 +36,11 @@ type PrivSignKey struct {
 	// Only one of these members is non-nil.
 	Rsa     *rsa.PrivateKey
 	Ec      *ecdsa.PrivateKey
-	Ed25519 *ed25519.PrivateKey
+	Ed25519 ed25519.PrivateKey
 }
 
 type PubSignKey struct {
+	// Only one of these members is non-nil.
 	Rsa     *rsa.PublicKey
 	Ec      *ecdsa.PublicKey
 	Ed25519 ed25519.PublicKey
@@ -51,68 +51,31 @@ type Sig struct {
 	Data    []byte
 }
 
-var oidPrivateKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
-
-func parsePrivSignKeyItf(keyBytes []byte) (interface{}, error) {
-	var privKey interface{}
-	var err error
-
-	block, data := pem.Decode(keyBytes)
-	if block != nil && block.Type == "EC PARAMETERS" {
-		/*
-		 * Openssl prepends an EC PARAMETERS block before the
-		 * key itself.  If we see this first, just skip it,
-		 * and go on to the data block.
-		 */
-		block, _ = pem.Decode(data)
-	}
-	if block != nil && block.Type == "RSA PRIVATE KEY" {
-		/*
-		 * ParsePKCS1PrivateKey returns an RSA private key from its ASN.1
-		 * PKCS#1 DER encoded form.
-		 */
-		privKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Priv key parsing failed")
-		}
-	}
-	if block != nil && block.Type == "EC PRIVATE KEY" {
-		/*
-		 * ParseECPrivateKey returns a EC private key
-		 */
-		privKey, err = x509.ParseECPrivateKey(block.Bytes)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Priv key parsing failed")
-		}
-	}
-	if block != nil && block.Type == "PRIVATE KEY" {
-		// This indicates a PKCS#8 unencrypted private key.
-		// The particular type of key will be indicated within
-		// the key itself.
-		privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-	}
-	if block != nil && block.Type == "ENCRYPTED PRIVATE KEY" {
-		// This indicates a PKCS#8 key wrapped with PKCS#5
-		// encryption.
-		privKey, err = parseEncryptedPrivateKey(block.Bytes)
-		if err != nil {
-			return nil, errors.Wrapf(
-				err, "Unable to decode encrypted private key")
-		}
-	}
-	if privKey == nil {
-		return nil, errors.Errorf(
-			"Unknown private key format, EC/RSA private " +
-				"key in PEM format only.")
+func ParsePrivSignKey(keyBytes []byte) (PrivSignKey, error) {
+	itf, err := parsePrivKey(keyBytes)
+	if err != nil {
+		return PrivSignKey{}, err
 	}
 
-	return privKey, nil
+	key := PrivSignKey{}
+	switch priv := itf.(type) {
+	case *rsa.PrivateKey:
+		key.Rsa = priv
+	case *ecdsa.PrivateKey:
+		key.Ec = priv
+	case ed25519.PrivateKey:
+		key.Ed25519 = priv
+	default:
+		return key, errors.Errorf("unknown private sign key type: %T", itf)
+	}
+
+	return key, nil
 }
 
 func ParsePubSignKey(keyBytes []byte) (PubSignKey, error) {
 	key := PubSignKey{}
 
-	itf, err := parsePubPemKey(keyBytes)
+	itf, err := parsePubKey(keyBytes)
 	if err != nil {
 		return key, err
 	}
@@ -126,28 +89,6 @@ func ParsePubSignKey(keyBytes []byte) (PubSignKey, error) {
 		key.Ed25519 = pub
 	default:
 		return key, errors.Errorf("unknown public signing key type: %T", pub)
-	}
-
-	return key, nil
-}
-
-func ParsePrivSignKey(keyBytes []byte) (PrivSignKey, error) {
-	key := PrivSignKey{}
-
-	itf, err := parsePrivSignKeyItf(keyBytes)
-	if err != nil {
-		return key, err
-	}
-
-	switch priv := itf.(type) {
-	case *rsa.PrivateKey:
-		key.Rsa = priv
-	case *ecdsa.PrivateKey:
-		key.Ec = priv
-	case ed25519.PrivateKey:
-		key.Ed25519 = &priv
-	default:
-		return key, errors.Errorf("unknown private key type: %T", itf)
 	}
 
 	return key, nil
