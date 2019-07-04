@@ -64,8 +64,7 @@ func Wrap(err error, message string) error {
 	if _, ok := err.(stackTracer); !ok {
 		return pkgerrors.Wrap(err, message)
 	} else {
-		msg := err.Error() + ": " + message
-		return pkgerrors.WithMessage(err, msg)
+		return pkgerrors.WithMessage(err, message)
 	}
 }
 
