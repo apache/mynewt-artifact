@@ -152,17 +152,7 @@ func unwrapPbes2Pbkdf2(param *pbkdf2Param, size int, iv []byte, hashNew hashFunc
 		return nil, err
 	}
 
-	privKey, err := x509.ParsePKCS8PrivateKey(plain)
-	if err != nil {
-		var _privKey interface{}
-		_privKey, _err := ParseEd25519Pkcs8(plain)
-		// If this is not an ed25519 key, return
-		// error from x509 parser
-		if _err == nil {
-			return _privKey, _err
-		}
-	}
-	return privKey, err
+	return x509.ParsePKCS8PrivateKey(plain)
 }
 
 // Verify that PKCS#7 padding is correct on this plaintext message.
