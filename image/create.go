@@ -27,6 +27,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/asn1"
+	"encoding/base64"
 	"encoding/binary"
 	"io/ioutil"
 	"math/big"
@@ -40,6 +41,8 @@ type ImageCreator struct {
 	Body         []byte
 	Version      ImageVersion
 	SigKeys      []sec.PrivSignKey
+	HWKeyIndex   int
+	Nonce        []byte
 	PlainSecret  []byte
 	CipherSecret []byte
 	HeaderSize   int
@@ -50,9 +53,12 @@ type ImageCreator struct {
 type ImageCreateOpts struct {
 	SrcBinFilename    string
 	SrcEncKeyFilename string
+	SrcEncKeyIndex    int
 	Version           ImageVersion
 	SigKeys           []sec.PrivSignKey
 	LoaderHash        []byte
+	HdrPad            int
+	ImagePad          int
 }
 
 type ECDSASig struct {
@@ -92,6 +98,30 @@ func sigTlvType(key sec.PrivSignKey) uint8 {
 	} else {
 		return IMAGE_TLV_ED25519
 	}
+}
+
+func GenerateHWKeyIndexTLV(secretIndex uint32) (ImageTlv, error) {
+	id := make([]byte, 4)
+	binary.LittleEndian.PutUint32(id, secretIndex)
+	return ImageTlv{
+		Header: ImageTlvHdr{
+			Type: IMAGE_TLV_SECRET_ID,
+			Pad:  0,
+			Len:  uint16(len(id)),
+		},
+		Data: id,
+	}, nil
+}
+
+func GenerateNonceTLV(nonce []byte) (ImageTlv, error) {
+	return ImageTlv{
+		Header: ImageTlvHdr{
+			Type: IMAGE_TLV_AES_NONCE,
+			Pad:  0,
+			Len:  uint16(len(nonce)),
+		},
+		Data: nonce,
+	}, nil
 }
 
 func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
@@ -243,12 +273,27 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic.Body = srcBin
 	ic.Version = opts.Version
 	ic.SigKeys = opts.SigKeys
+	ic.HWKeyIndex = opts.SrcEncKeyIndex
 
 	if opts.LoaderHash != nil {
 		ic.InitialHash = opts.LoaderHash
 		ic.Bootable = false
 	} else {
 		ic.Bootable = true
+	}
+
+	if opts.HdrPad > 0 {
+		ic.HeaderSize = opts.HdrPad
+	}
+
+	if opts.ImagePad > 0 {
+		pad := opts.ImagePad - (len(ic.Body) % opts.ImagePad)
+		ic.Body = append(ic.Body, bytes.Repeat([]byte{byte(0xff)}, pad)...)
+	}
+
+	if ic.HWKeyIndex >= 0 {
+		hash := sha256.Sum256(ic.Body)
+		ic.Nonce = hash[:8]
 	}
 
 	if opts.SrcEncKeyFilename != "" {
@@ -262,18 +307,25 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 			return Image{}, errors.Wrapf(err, "error reading pubkey file")
 		}
 
-		pubKe, err := sec.ParsePubEncKey(pubKeBytes)
-		if err != nil {
-			return Image{}, err
-		}
+		if ic.HWKeyIndex < 0 {
+			pubKe, err := sec.ParsePubEncKey(pubKeBytes)
+			if err != nil {
+				return Image{}, err
+			}
 
-		cipherSecret, err := pubKe.Encrypt(plainSecret)
-		if err != nil {
-			return Image{}, err
-		}
+			cipherSecret, err := pubKe.Encrypt(plainSecret)
+			if err != nil {
+				return Image{}, err
+			}
 
-		ic.PlainSecret = plainSecret
-		ic.CipherSecret = cipherSecret
+			ic.CipherSecret = cipherSecret
+			ic.PlainSecret = plainSecret
+		} else {
+			ic.PlainSecret, err = base64.StdEncoding.DecodeString(string(pubKeBytes))
+			if err != nil {
+				return Image{}, err
+			}
+		}
 	}
 
 	ri, err := ic.Create()
@@ -349,7 +401,8 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Header.Flags |= IMAGE_F_NON_BOOTABLE
 	}
 
-	if ic.CipherSecret != nil {
+    // Set encrypted image flag if image is to be treated as encrypted
+	if ic.CipherSecret != nil && ic.HWKeyIndex < 0 {
 		img.Header.Flags |= IMAGE_F_ENCRYPTED
 	}
 
@@ -373,7 +426,7 @@ func (ic *ImageCreator) Create() (Image, error) {
 
 	// Followed by data.
 	if ic.CipherSecret != nil {
-		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret)
+		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
 		if err != nil {
 			return img, err
 		}
@@ -399,7 +452,19 @@ func (ic *ImageCreator) Create() (Image, error) {
 	}
 	img.Tlvs = append(img.Tlvs, tlvs...)
 
-	if ic.CipherSecret != nil {
+	if ic.HWKeyIndex > 0 {
+		tlv, err := GenerateHWKeyIndexTLV(uint32(ic.HWKeyIndex))
+		if err != nil {
+			return img, err
+		}
+		img.Tlvs = append(img.Tlvs, tlv)
+
+		tlv, err = GenerateNonceTLV(ic.Nonce)
+		if err != nil {
+			return img, err
+		}
+		img.Tlvs = append(img.Tlvs, tlv)
+	} else if ic.CipherSecret != nil {
 		tlv, err := GenerateEncTlv(ic.CipherSecret)
 		if err != nil {
 			return img, err
