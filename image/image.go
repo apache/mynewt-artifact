@@ -54,27 +54,31 @@ const (
  * Image trailer TLV types.
  */
 const (
-	IMAGE_TLV_KEYHASH  = 0x01
-	IMAGE_TLV_SHA256   = 0x10
-	IMAGE_TLV_RSA2048  = 0x20
-	IMAGE_TLV_ECDSA224 = 0x21
-	IMAGE_TLV_ECDSA256 = 0x22
-	IMAGE_TLV_RSA3072  = 0x23
-	IMAGE_TLV_ED25519  = 0x24
-	IMAGE_TLV_ENC_RSA  = 0x30
-	IMAGE_TLV_ENC_KEK  = 0x31
+	IMAGE_TLV_KEYHASH   = 0x01
+	IMAGE_TLV_SHA256    = 0x10
+	IMAGE_TLV_RSA2048   = 0x20
+	IMAGE_TLV_ECDSA224  = 0x21
+	IMAGE_TLV_ECDSA256  = 0x22
+	IMAGE_TLV_RSA3072   = 0x23
+	IMAGE_TLV_ED25519   = 0x24
+	IMAGE_TLV_ENC_RSA   = 0x30
+	IMAGE_TLV_ENC_KEK   = 0x31
+	IMAGE_TLV_AES_NONCE = 0x50
+	IMAGE_TLV_SECRET_ID = 0x60
 )
 
 var imageTlvTypeNameMap = map[uint8]string{
-	IMAGE_TLV_KEYHASH:  "KEYHASH",
-	IMAGE_TLV_SHA256:   "SHA256",
-	IMAGE_TLV_RSA2048:  "RSA2048",
-	IMAGE_TLV_ECDSA224: "ECDSA224",
-	IMAGE_TLV_ECDSA256: "ECDSA256",
-	IMAGE_TLV_RSA3072:  "RSA3072",
-	IMAGE_TLV_ED25519:  "ED25519",
-	IMAGE_TLV_ENC_RSA:  "ENC_RSA",
-	IMAGE_TLV_ENC_KEK:  "ENC_KEK",
+	IMAGE_TLV_KEYHASH:   "KEYHASH",
+	IMAGE_TLV_SHA256:    "SHA256",
+	IMAGE_TLV_RSA2048:   "RSA2048",
+	IMAGE_TLV_ECDSA224:  "ECDSA224",
+	IMAGE_TLV_ECDSA256:  "ECDSA256",
+	IMAGE_TLV_RSA3072:   "RSA3072",
+	IMAGE_TLV_ED25519:   "ED25519",
+	IMAGE_TLV_ENC_RSA:   "ENC_RSA",
+	IMAGE_TLV_ENC_KEK:   "ENC_KEK",
+	IMAGE_TLV_AES_NONCE: "AES_NONCE",
+	IMAGE_TLV_SECRET_ID: "SEC_KEY_ID",
 }
 
 type ImageVersion struct {
@@ -496,7 +500,7 @@ func Encrypt(img Image, pubEncKey sec.PubEncKey) (Image, error) {
 		return dup, err
 	}
 
-	body, err := sec.EncryptAES(dup.Body, plainSecret)
+	body, err := sec.EncryptAES(dup.Body, plainSecret, nil)
 	if err != nil {
 		return dup, err
 	}
@@ -531,7 +535,7 @@ func Decrypt(img Image, privEncKey sec.PrivEncKey) (Image, error) {
 		return img, err
 	}
 
-	body, err := sec.EncryptAES(dup.Body, plainSecret)
+	body, err := sec.EncryptAES(dup.Body, plainSecret, nil)
 	if err != nil {
 		return img, err
 	}

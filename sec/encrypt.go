@@ -64,9 +64,9 @@ func parsePubKePem(b []byte) (PubEncKey, error) {
 }
 
 func parsePubKeBase64(keyBytes []byte) (PubEncKey, error) {
-	if len(keyBytes) != 16 {
+	if len(keyBytes) != 16 && len(keyBytes) != 32 {
 		return PubEncKey{}, errors.Errorf(
-			"unexpected key size: %d != 16", len(keyBytes))
+			"unexpected key size: %d != 16 or 32", len(keyBytes))
 	}
 
 	cipher, err := aes.NewCipher(keyBytes)
@@ -151,13 +151,21 @@ func (k *PrivEncKey) Decrypt(ciph []byte) ([]byte, error) {
 	return decryptRsa(k.Rsa, ciph)
 }
 
-func EncryptAES(plain []byte, secret []byte) ([]byte, error) {
+func EncryptAES(plain []byte, secret []byte, nonce []byte) ([]byte, error) {
 	blk, err := aes.NewCipher(secret)
 	if err != nil {
 		return nil, errors.Errorf("Failed to create block cipher")
 	}
-	nonce := make([]byte, 16)
-	stream := cipher.NewCTR(blk, nonce)
+
+	var iv []byte
+	if nonce == nil {
+		iv = make([]byte, 16)
+	} else {
+		zeros := make([]byte, 8)
+		iv = append(nonce, zeros...)
+	}
+
+	stream := cipher.NewCTR(blk, iv)
 
 	dataBuf := make([]byte, 16)
 	encBuf := make([]byte, 16)
