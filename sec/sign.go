@@ -53,30 +53,6 @@ type Sig struct {
 
 var oidPrivateKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
 
-// Parse an ed25519 PKCS#8 certificate
-func ParseEd25519Pkcs8(der []byte) (key *ed25519.PrivateKey, err error) {
-	var privKey struct {
-		Version int
-		Algo    pkix.AlgorithmIdentifier
-		SeedKey []byte
-	}
-
-	if _, err := asn1.Unmarshal(der, &privKey); err != nil {
-		return nil, errors.Errorf("error parsing ASN1 key")
-	}
-	switch {
-	case privKey.Algo.Algorithm.Equal(oidPrivateKeyEd25519):
-		// ASN1 header (type+length) + seed
-		if len(privKey.SeedKey) != ed25519.SeedSize+2 {
-			return nil, errors.Errorf("unexpected size for Ed25519 private key")
-		}
-		key := ed25519.NewKeyFromSeed(privKey.SeedKey[2:])
-		return &key, nil
-	default:
-		return nil, errors.Errorf("x509: PKCS#8 wrapping contained private key with unknown algorithm: %v", privKey.Algo.Algorithm)
-	}
-}
-
 func parsePrivSignKeyItf(keyBytes []byte) (interface{}, error) {
 	var privKey interface{}
 	var err error
@@ -114,23 +90,6 @@ func parsePrivSignKeyItf(keyBytes []byte) (interface{}, error) {
 		// The particular type of key will be indicated within
 		// the key itself.
 		privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Priv key parsing failed")
-		}
-	}
-	if block != nil && block.Type == "PRIVATE KEY" {
-		// This indicates a PKCS#8 unencrypted private key.
-		// The particular type of key will be indicated within
-		// the key itself.
-		privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			var _privKey interface{}
-			_privKey, err = ParseEd25519Pkcs8(block.Bytes)
-			if err != nil {
-				return nil, errors.Wrapf(err, "private key parsing failed")
-			}
-			privKey = _privKey
-		}
 	}
 	if block != nil && block.Type == "ENCRYPTED PRIVATE KEY" {
 		// This indicates a PKCS#8 key wrapped with PKCS#5
@@ -185,8 +144,8 @@ func ParsePrivSignKey(keyBytes []byte) (PrivSignKey, error) {
 		key.Rsa = priv
 	case *ecdsa.PrivateKey:
 		key.Ec = priv
-	case *ed25519.PrivateKey:
-		key.Ed25519 = priv
+	case ed25519.PrivateKey:
+		key.Ed25519 = &priv
 	default:
 		return key, errors.Errorf("unknown private key type: %T", itf)
 	}
@@ -288,9 +247,9 @@ func (key *PubSignKey) Bytes() ([]byte, error) {
 	key.AssertValid()
 
 	var b []byte
+	var err error
 
 	if key.Rsa != nil {
-		var err error
 		b, err = asn1.Marshal(*key.Rsa)
 		if err != nil {
 			return nil, err
@@ -300,12 +259,18 @@ func (key *PubSignKey) Bytes() ([]byte, error) {
 		case "P-224":
 			fallthrough
 		case "P-256":
-			b, _ = x509.MarshalPKIXPublicKey(*key.Ec)
+			b, err = x509.MarshalPKIXPublicKey(key.Ec)
+			if err != nil {
+				return nil, err
+			}
 		default:
 			return nil, errors.Errorf("unsupported ECC curve")
 		}
 	} else {
-		b, _ = marshalEd25519([]byte(key.Ed25519))
+		b, err = marshalEd25519([]byte(key.Ed25519))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return b, nil
