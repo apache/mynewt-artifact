@@ -337,7 +337,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 }
 
 func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
-	plainBody []byte) ([]byte, error) {
+	plainBody []byte, protTlvs []ImageTlv) ([]byte, error) {
 
 	hash := sha256.New()
 
@@ -371,7 +371,38 @@ func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
 		return nil, err
 	}
 
+	if len(protTlvs) > 0 {
+		trailer := ImageTrailer{
+			Magic:     IMAGE_PROT_TRAILER_MAGIC,
+			TlvTotLen: hdr.ProtSz,
+		}
+		if err := add(trailer); err != nil {
+			return nil, err
+		}
+
+		for _, tlv := range protTlvs {
+			if err := add(tlv.Header); err != nil {
+				return nil, err
+			}
+			if err := add(tlv.Data); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return hash.Sum(nil), nil
+}
+
+func calcProtSize(protTlvs []ImageTlv) uint16 {
+	var size = uint16(0)
+	for _, tlv := range protTlvs {
+		size += IMAGE_TLV_SIZE
+		size += tlv.Header.Len
+	}
+	if size > 0 {
+		size += IMAGE_TRAILER_SIZE
+	}
+	return size
 }
 
 func (ic *ImageCreator) Create() (Image, error) {
@@ -379,14 +410,14 @@ func (ic *ImageCreator) Create() (Image, error) {
 
 	// First the header
 	img.Header = ImageHdr{
-		Magic: IMAGE_MAGIC,
-		Pad1:  0,
-		HdrSz: IMAGE_HEADER_SIZE,
-		Pad2:  0,
-		ImgSz: uint32(len(ic.Body)),
-		Flags: 0,
-		Vers:  ic.Version,
-		Pad3:  0,
+		Magic:  IMAGE_MAGIC,
+		Pad1:   0,
+		HdrSz:  IMAGE_HEADER_SIZE,
+		ProtSz: 0,
+		ImgSz:  uint32(len(ic.Body)),
+		Flags:  0,
+		Vers:   ic.Version,
+		Pad3:   0,
 	}
 
 	if !ic.Bootable {
@@ -411,6 +442,22 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Pad = make([]byte, extra)
 	}
 
+	if ic.HWKeyIndex >= 0 {
+		tlv, err := GenerateHWKeyIndexTLV(uint32(ic.HWKeyIndex))
+		if err != nil {
+			return img, err
+		}
+		img.ProtTlvs = append(img.ProtTlvs, tlv)
+
+		tlv, err = GenerateNonceTLV(ic.Nonce)
+		if err != nil {
+			return img, err
+		}
+		img.ProtTlvs = append(img.ProtTlvs, tlv)
+	}
+
+	img.Header.ProtSz = calcProtSize(img.ProtTlvs)
+
 	payload := &ic.Body
 
 	// Followed by data.
@@ -429,7 +476,7 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Body = append(img.Body, ic.Body...)
 	}
 
-	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload)
+	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload, img.ProtTlvs)
 	if err != nil {
 		return img, err
 	}
@@ -451,19 +498,7 @@ func (ic *ImageCreator) Create() (Image, error) {
 	}
 	img.Tlvs = append(img.Tlvs, tlvs...)
 
-	if ic.HWKeyIndex > 0 {
-		tlv, err := GenerateHWKeyIndexTLV(uint32(ic.HWKeyIndex))
-		if err != nil {
-			return img, err
-		}
-		img.Tlvs = append(img.Tlvs, tlv)
-
-		tlv, err = GenerateNonceTLV(ic.Nonce)
-		if err != nil {
-			return img, err
-		}
-		img.Tlvs = append(img.Tlvs, tlv)
-	} else if ic.CipherSecret != nil {
+	if ic.HWKeyIndex < 0 && ic.CipherSecret != nil {
 		tlv, err := GenerateEncTlv(ic.CipherSecret)
 		if err != nil {
 			return img, err
