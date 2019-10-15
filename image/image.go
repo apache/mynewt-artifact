@@ -31,8 +31,9 @@ import (
 )
 
 const (
-	IMAGE_MAGIC         = 0x96f3b83d /* Image header magic */
-	IMAGE_TRAILER_MAGIC = 0x6907     /* Image tlv info magic */
+	IMAGE_MAGIC              = 0x96f3b83d /* Image header magic */
+	IMAGE_TRAILER_MAGIC      = 0x6907     /* TLV info magic */
+	IMAGE_PROT_TRAILER_MAGIC = 0x6908     /* Protected TLV info magic */
 )
 
 const (
@@ -89,14 +90,14 @@ type ImageVersion struct {
 }
 
 type ImageHdr struct {
-	Magic uint32
-	Pad1  uint32
-	HdrSz uint16
-	Pad2  uint16
-	ImgSz uint32
-	Flags uint32
-	Vers  ImageVersion
-	Pad3  uint32
+	Magic  uint32
+	Pad1   uint32
+	HdrSz  uint16
+	ProtSz uint16
+	ImgSz  uint32
+	Flags  uint32
+	Vers   ImageVersion
+	Pad3   uint32
 }
 
 type ImageTlvHdr struct {
@@ -116,18 +117,21 @@ type ImageTrailer struct {
 }
 
 type Image struct {
-	Header ImageHdr
-	Pad    []byte
-	Body   []byte
-	Tlvs   []ImageTlv
+	Header   ImageHdr
+	Pad      []byte
+	Body     []byte
+	ProtTlvs []ImageTlv
+	Tlvs     []ImageTlv
 }
 
 type ImageOffsets struct {
-	Header    int
-	Body      int
-	Trailer   int
-	Tlvs      []int
-	TotalSize int
+	Header      int
+	Body        int
+	ProtTrailer int
+	Trailer     int
+	ProtTlvs    []int
+	Tlvs        []int
+	TotalSize   int
 }
 
 func ImageTlvTypeIsValid(tlvType uint8) bool {
@@ -190,10 +194,15 @@ func (tlv *ImageTlv) Write(w io.Writer) (int, error) {
 // Clone performs a deep copy of an image.
 func (img *Image) Clone() Image {
 	dup := Image{
-		Header: img.Header,
-		Pad:    append([]byte(nil), img.Pad...),
-		Body:   append([]byte(nil), img.Body...),
-		Tlvs:   make([]ImageTlv, len(img.Tlvs)),
+		Header:   img.Header,
+		Pad:      append([]byte(nil), img.Pad...),
+		Body:     append([]byte(nil), img.Body...),
+		ProtTlvs: make([]ImageTlv, len(img.ProtTlvs)),
+		Tlvs:     make([]ImageTlv, len(img.Tlvs)),
+	}
+
+	for i, tlv := range img.ProtTlvs {
+		dup.ProtTlvs[i] = tlv.Clone()
 	}
 
 	for i, tlv := range img.Tlvs {
@@ -291,7 +300,20 @@ func (i *Image) RemoveTlvsWithType(tlvType uint8) []ImageTlv {
 	})
 }
 
-// ImageTrailer constructs an image trailer corresponding to the given image.
+// ProtTrailer constructs a protected ImageTrailer corresponding to the given image.
+func (img *Image) ProtTrailer() ImageTrailer {
+	trailer := ImageTrailer{
+		Magic:     IMAGE_PROT_TRAILER_MAGIC,
+		TlvTotLen: IMAGE_TRAILER_SIZE,
+	}
+	for _, tlv := range img.ProtTlvs {
+		trailer.TlvTotLen += IMAGE_TLV_SIZE + tlv.Header.Len
+	}
+
+	return trailer
+}
+
+// Trailer constructs an ImageTrailer corresponding to the given image.
 func (img *Image) Trailer() ImageTrailer {
 	trailer := ImageTrailer{
 		Magic:     IMAGE_TRAILER_MAGIC,
@@ -321,7 +343,7 @@ func (i *Image) Hash() ([]byte, error) {
 
 // CalcHash calculates a SHA256 of the given image.
 func (i *Image) CalcHash() ([]byte, error) {
-	return calcHash(nil, i.Header, i.Pad, i.Body)
+	return calcHash(nil, i.Header, i.Pad, i.Body, i.ProtTlvs)
 }
 
 // WritePlusOffsets writes a binary image to the given writer.  It returns
@@ -350,6 +372,25 @@ func (i *Image) WritePlusOffsets(w io.Writer) (ImageOffsets, error) {
 		return offs, errors.Wrapf(err, "failed to write image body")
 	}
 	offset += size
+
+	if i.Header.ProtSz > 0 {
+		protTrailer := i.ProtTrailer()
+		offs.ProtTrailer = offset
+		err = binary.Write(w, binary.LittleEndian, &protTrailer)
+		if err != nil {
+			return offs, errors.Wrapf(err, "failed to write image trailer")
+		}
+		offset += IMAGE_TRAILER_SIZE
+
+		for _, tlv := range i.ProtTlvs {
+			offs.ProtTlvs = append(offs.ProtTlvs, offset)
+			size, err := tlv.Write(w)
+			if err != nil {
+				return offs, errors.Wrapf(err, "failed to write image TLV")
+			}
+			offset += size
+		}
+	}
 
 	trailer := i.Trailer()
 	offs.Trailer = offset
