@@ -287,8 +287,8 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	}
 
 	if opts.ImagePad > 0 {
-		pad := opts.ImagePad - (len(ic.Body) % opts.ImagePad)
-		ic.Body = append(ic.Body, bytes.Repeat([]byte{byte(0xff)}, pad)...)
+		tail_pad := opts.ImagePad - (len(ic.Body) % opts.ImagePad)
+		ic.Body = append(ic.Body, bytes.Repeat([]byte{byte(0xff)}, tail_pad)...)
 	}
 
 	if ic.HWKeyIndex >= 0 {
@@ -367,14 +367,6 @@ func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
 		return nil, err
 	}
 
-	extra := hdr.HdrSz - IMAGE_HEADER_SIZE
-	if extra > 0 {
-		b := make([]byte, extra)
-		if err := add(b); err != nil {
-			return nil, err
-		}
-	}
-
 	if err := add(plainBody); err != nil {
 		return nil, err
 	}
@@ -401,7 +393,7 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Header.Flags |= IMAGE_F_NON_BOOTABLE
 	}
 
-    // Set encrypted image flag if image is to be treated as encrypted
+	// Set encrypted image flag if image is to be treated as encrypted
 	if ic.CipherSecret != nil && ic.HWKeyIndex < 0 {
 		img.Header.Flags |= IMAGE_F_ENCRYPTED
 	}
@@ -419,20 +411,27 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Pad = make([]byte, extra)
 	}
 
-	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, ic.Body)
-	if err != nil {
-		return img, err
-	}
+	payload := &ic.Body
 
 	// Followed by data.
-	if ic.CipherSecret != nil {
+	if ic.PlainSecret != nil {
 		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
 		if err != nil {
 			return img, err
 		}
 		img.Body = append(img.Body, encBody...)
+
+		if ic.HWKeyIndex >= 0 {
+			payload = &encBody
+		}
+
 	} else {
 		img.Body = append(img.Body, ic.Body...)
+	}
+
+	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload)
+	if err != nil {
+		return img, err
 	}
 
 	// Hash TLV.
