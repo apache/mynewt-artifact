@@ -30,18 +30,20 @@ import (
 )
 
 type MfgManifestTarget struct {
-	Name         string `json:"name"`
-	Offset       int    `json:"offset"`
-	BinPath      string `json:"bin_path,omitempty"`
-	ImagePath    string `json:"image_path,omitempty"`
-	HexPath      string `json:"hex_path,omitempty"`
-	ManifestPath string `json:"manifest_path"`
+	Name         string                 `json:"name"`
+	Offset       int                    `json:"offset"`
+	BinPath      string                 `json:"bin_path,omitempty"`
+	ImagePath    string                 `json:"image_path,omitempty"`
+	HexPath      string                 `json:"hex_path,omitempty"`
+	ManifestPath string                 `json:"manifest_path"`
+	Extra        map[string]interface{} `json:"extra,omitempty"`
 }
 
 type MfgManifestRaw struct {
-	Filename string `json:"filename"`
-	Offset   int    `json:"offset"`
-	BinPath  string `json:"bin_path"`
+	Filename string                 `json:"filename"`
+	Offset   int                    `json:"offset"`
+	BinPath  string                 `json:"bin_path"`
+	Extra    map[string]interface{} `json:"extra,omitempty"`
 }
 
 type MfgManifestMetaMmr struct {
