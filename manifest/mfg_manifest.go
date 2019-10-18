@@ -38,6 +38,12 @@ type MfgManifestTarget struct {
 	ManifestPath string `json:"manifest_path"`
 }
 
+type MfgManifestRaw struct {
+	Filename string `json:"filename"`
+	Offset   int    `json:"offset"`
+	BinPath  string `json:"bin_path"`
+}
+
 type MfgManifestMetaMmr struct {
 	Area      string `json:"area"`
 	Device    int    `json:"_device"`
@@ -72,6 +78,7 @@ type MfgManifest struct {
 	FlashAreas []flash.FlashArea `json:"flash_map"`
 
 	Targets []MfgManifestTarget `json:"targets"`
+	Raws    []MfgManifestRaw    `json:"raws"`
 	Meta    *MfgManifestMeta    `json:"meta,omitempty"`
 }
 
