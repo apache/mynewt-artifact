@@ -34,6 +34,14 @@ import (
 	"github.com/apache/mynewt-artifact/errors"
 )
 
+type EncType int
+
+const (
+	ENC_TYPE_AES_128 EncType = iota
+	ENC_TYPE_AES_256
+	ENC_TYPE_RSA_2048
+)
+
 // XXX: Only RSA supported for now.
 type PrivEncKey struct {
 	Rsa *rsa.PrivateKey
@@ -42,6 +50,31 @@ type PrivEncKey struct {
 type PubEncKey struct {
 	Rsa *rsa.PublicKey
 	Aes cipher.Block
+}
+
+var encTypeNameMap = map[EncType]string{
+	ENC_TYPE_AES_128:  "aes128",
+	ENC_TYPE_AES_256:  "aes256",
+	ENC_TYPE_RSA_2048: "rsa2048",
+}
+
+func EncTypeString(typ EncType) string {
+	s := encTypeNameMap[typ]
+	if s == "" {
+		return "unknown"
+	} else {
+		return s
+	}
+}
+
+func EncStringType(s string) (EncType, error) {
+	for k, v := range encTypeNameMap {
+		if s == v {
+			return k, nil
+		}
+	}
+
+	return 0, errors.Errorf("unknown enc type name: \"%s\"", s)
 }
 
 func parsePubKePem(b []byte) (PubEncKey, error) {
@@ -99,6 +132,23 @@ func (key *PrivEncKey) PubEncKey() PubEncKey {
 func (key *PubEncKey) AssertValid() {
 	if key.Rsa == nil && key.Aes == nil {
 		panic("invalid public encryption key; neither RSA nor AES")
+	}
+}
+
+func (key *PubEncKey) EncType() (EncType, error) {
+	if key.Rsa != nil {
+		return ENC_TYPE_RSA_2048, nil
+	} else if key.Aes != nil {
+		switch key.Aes.BlockSize() {
+		case 128 / 8:
+			return ENC_TYPE_AES_128, nil
+		case 256 / 8:
+			return ENC_TYPE_AES_256, nil
+		default:
+			return 0, errors.Errorf("illegal AES key block size: %d", key.Aes.BlockSize())
+		}
+	} else {
+		return 0, errors.Errorf("invalid enc key: all members nil")
 	}
 }
 
