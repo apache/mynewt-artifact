@@ -338,12 +338,20 @@ func (key *PubSignKey) SigType() (SigType, error) {
 	return 0, errors.Errorf("invalid key: no non-nil members")
 }
 
-func checkOneKeyOneSig(k PubSignKey, sig Sig, hash []byte) (bool, error) {
-	pubBytes, err := k.Bytes()
+func (key *PubSignKey) Hash() ([]byte, error) {
+	pubBytes, err := key.Bytes()
 	if err != nil {
-		return false, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
-	keyHash := RawKeyHash(pubBytes)
+
+	return RawKeyHash(pubBytes), nil
+}
+
+func checkOneKeyOneSig(k PubSignKey, sig Sig, hash []byte) (bool, error) {
+	keyHash, err := k.Hash()
+	if err != nil {
+		return false, err
+	}
 
 	if !bytes.Equal(keyHash, sig.KeyHash) {
 		return false, nil
