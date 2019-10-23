@@ -197,16 +197,43 @@ func GenerateSigEd25519(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	return sig, nil
 }
 
-func GenerateSig(key sec.PrivSignKey, hash []byte) ([]byte, error) {
-	key.AssertValid()
-
-	if key.Rsa != nil {
-		return GenerateSigRsa(key, hash)
-	} else if key.Ec != nil {
-		return GenerateSigEc(key, hash)
-	} else {
-		return GenerateSigEd25519(key, hash)
+func GenerateSig(key sec.PrivSignKey, hash []byte) (sec.Sig, error) {
+	pub := key.PubKey()
+	typ, err := pub.SigType()
+	if err != nil {
+		return sec.Sig{}, err
 	}
+
+	var data []byte
+
+	switch typ {
+	case sec.SIG_TYPE_RSA2048, sec.SIG_TYPE_RSA3072:
+		data, err = GenerateSigRsa(key, hash)
+
+	case sec.SIG_TYPE_ECDSA224, sec.SIG_TYPE_ECDSA256:
+		data, err = GenerateSigEc(key, hash)
+
+	case sec.SIG_TYPE_ED25519:
+		data, err = GenerateSigEd25519(key, hash)
+
+	default:
+		err = errors.Errorf("unknown sig type: %v", typ)
+	}
+
+	if err != nil {
+		return sec.Sig{}, err
+	}
+
+	keyHash, err := pub.Hash()
+	if err != nil {
+		return sec.Sig{}, err
+	}
+
+	return sec.Sig{
+		Type:    typ,
+		KeyHash: keyHash,
+		Data:    data,
+	}, nil
 }
 
 func BuildKeyHashTlv(keyBytes []byte) ImageTlv {
@@ -243,9 +270,9 @@ func BuildSigTlvs(keys []sec.PrivSignKey, hash []byte) ([]ImageTlv, error) {
 		tlv = ImageTlv{
 			Header: ImageTlvHdr{
 				Type: sigTlvType(key),
-				Len:  uint16(len(sig)),
+				Len:  uint16(len(sig.Data)),
 			},
-			Data: sig,
+			Data: sig.Data,
 		}
 		tlvs = append(tlvs, tlv)
 	}
