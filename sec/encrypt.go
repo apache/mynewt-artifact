@@ -90,6 +90,12 @@ func ParsePubEncKey(keyBytes []byte) (PubEncKey, error) {
 	return parsePubKePem(keyBytes)
 }
 
+func (key *PrivEncKey) PubEncKey() PubEncKey {
+	return PubEncKey{
+		Rsa: key.Rsa.Public().(*rsa.PublicKey),
+	}
+}
+
 func (key *PubEncKey) AssertValid() {
 	if key.Rsa == nil && key.Aes == nil {
 		panic("invalid public encryption key; neither RSA nor AES")
