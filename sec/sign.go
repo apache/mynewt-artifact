@@ -33,6 +33,24 @@ import (
 	"golang.org/x/crypto/ed25519"
 )
 
+type SigType int
+
+const (
+	SIG_TYPE_RSA2048 SigType = iota
+	SIG_TYPE_RSA3072
+	SIG_TYPE_ECDSA224
+	SIG_TYPE_ECDSA256
+	SIG_TYPE_ED25519
+)
+
+var sigTypeNameMap = map[SigType]string{
+	SIG_TYPE_RSA2048:  "rsa2048",
+	SIG_TYPE_ECDSA224: "ecdsa224",
+	SIG_TYPE_ECDSA256: "ecdsa256",
+	SIG_TYPE_RSA3072:  "rsa3072",
+	SIG_TYPE_ED25519:  "ed25519",
+}
+
 type PrivSignKey struct {
 	// Only one of these members is non-nil.
 	Rsa     *rsa.PrivateKey
@@ -47,11 +65,31 @@ type PubSignKey struct {
 }
 
 type Sig struct {
+	Type    SigType
 	KeyHash []byte
 	Data    []byte
 }
 
 var oidPrivateKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
+
+func SigTypeString(typ SigType) string {
+	s := sigTypeNameMap[typ]
+	if s == "" {
+		return "unknown"
+	} else {
+		return s
+	}
+}
+
+func SigStringType(s string) (SigType, error) {
+	for k, v := range sigTypeNameMap {
+		if s == v {
+			return k, nil
+		}
+	}
+
+	return 0, errors.Errorf("unknown sig type name: \"%s\"", s)
+}
 
 func parsePrivSignKeyItf(keyBytes []byte) (interface{}, error) {
 	var privKey interface{}
@@ -249,31 +287,55 @@ func (key *PubSignKey) Bytes() ([]byte, error) {
 	var b []byte
 	var err error
 
-	if key.Rsa != nil {
+	typ, err := key.SigType()
+	if err != nil {
+		return nil, err
+	}
+
+	switch typ {
+	case SIG_TYPE_RSA2048, SIG_TYPE_RSA3072:
 		b, err = asn1.Marshal(*key.Rsa)
-		if err != nil {
-			return nil, err
+
+	case SIG_TYPE_ECDSA224, SIG_TYPE_ECDSA256:
+		b, err = x509.MarshalPKIXPublicKey(key.Ec)
+
+	case SIG_TYPE_ED25519:
+		b, err = marshalEd25519([]byte(key.Ed25519))
+
+	default:
+		err = errors.Errorf("unknown sig type: %v", typ)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func (key *PubSignKey) SigType() (SigType, error) {
+	if key.Rsa != nil {
+		switch key.Rsa.Size() {
+		case 2048 / 8:
+			return SIG_TYPE_RSA2048, nil
+		case 3072 / 8:
+			return SIG_TYPE_RSA3072, nil
+		default:
+			return 0, errors.Errorf("unknown RSA key size (bytes): %d", key.Rsa.Size())
 		}
 	} else if key.Ec != nil {
 		switch key.Ec.Curve.Params().Name {
 		case "P-224":
-			fallthrough
+			return SIG_TYPE_ECDSA224, nil
 		case "P-256":
-			b, err = x509.MarshalPKIXPublicKey(key.Ec)
-			if err != nil {
-				return nil, err
-			}
+			return SIG_TYPE_ECDSA256, nil
 		default:
-			return nil, errors.Errorf("unsupported ECC curve")
+			return 0, errors.Errorf("unknown EC curve: %s", key.Ec.Curve.Params().Name)
 		}
-	} else {
-		b, err = marshalEd25519([]byte(key.Ed25519))
-		if err != nil {
-			return nil, err
-		}
+	} else if key.Ed25519 != nil {
+		return SIG_TYPE_ED25519, nil
 	}
 
-	return b, nil
+	return 0, errors.Errorf("invalid key: no non-nil members")
 }
 
 func checkOneKeyOneSig(k PubSignKey, sig Sig, hash []byte) (bool, error) {

@@ -61,8 +61,9 @@ type MfgManifestMeta struct {
 }
 
 type MfgManifestSig struct {
-	Key string `json:"key"`
-	Sig string `json:"sig"`
+	Type string `json:"type"`
+	Key  string `json:"key"`
+	Sig  string `json:"sig"`
 }
 
 type MfgManifest struct {
