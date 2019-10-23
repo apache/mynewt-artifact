@@ -82,6 +82,14 @@ var imageTlvTypeNameMap = map[uint8]string{
 	IMAGE_TLV_SECRET_ID: "SEC_KEY_ID",
 }
 
+var imageTlvTypeSigTypeMap = map[uint8]sec.SigType{
+	IMAGE_TLV_RSA2048:  sec.SIG_TYPE_RSA2048,
+	IMAGE_TLV_ECDSA224: sec.SIG_TYPE_ECDSA224,
+	IMAGE_TLV_ECDSA256: sec.SIG_TYPE_ECDSA256,
+	IMAGE_TLV_RSA3072:  sec.SIG_TYPE_RSA3072,
+	IMAGE_TLV_ED25519:  sec.SIG_TYPE_ED25519,
+}
+
 type ImageVersion struct {
 	Major    uint8
 	Minor    uint8
@@ -146,6 +154,11 @@ func ImageTlvTypeName(tlvType uint8) string {
 	}
 
 	return name
+}
+
+func ImageTlvTypeToSigType(tlvType uint8) (sec.SigType, bool) {
+	typ, ok := imageTlvTypeSigTypeMap[tlvType]
+	return typ, ok
 }
 
 func ImageTlvTypeIsSig(tlvType uint8) bool {
@@ -468,18 +481,22 @@ func (img *Image) CollectSigs() ([]sec.Sig, error) {
 					"image contains keyhash tlv without subsequent signature")
 			}
 			keyHashTlv = t
-		} else if ImageTlvTypeIsSig(t.Header.Type) {
-			if keyHashTlv == nil {
-				return nil, errors.Errorf(
-					"image contains signature tlv without preceding keyhash")
+		} else {
+			sigType, ok := ImageTlvTypeToSigType(t.Header.Type)
+			if ok {
+				if keyHashTlv == nil {
+					return nil, errors.Errorf(
+						"image contains signature tlv without preceding keyhash")
+				}
+
+				sigs = append(sigs, sec.Sig{
+					Type:    sigType,
+					KeyHash: keyHashTlv.Data,
+					Data:    t.Data,
+				})
+
+				keyHashTlv = nil
 			}
-
-			sigs = append(sigs, sec.Sig{
-				KeyHash: keyHashTlv.Data,
-				Data:    t.Data,
-			})
-
-			keyHashTlv = nil
 		}
 	}
 
