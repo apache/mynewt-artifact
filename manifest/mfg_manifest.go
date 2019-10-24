@@ -42,6 +42,7 @@ type MfgManifestTarget struct {
 type MfgManifestRaw struct {
 	Filename string                 `json:"filename"`
 	Offset   int                    `json:"offset"`
+	Size     int                    `json:"size"`
 	BinPath  string                 `json:"bin_path"`
 	Extra    map[string]interface{} `json:"extra,omitempty"`
 }
