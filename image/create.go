@@ -350,7 +350,8 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 		} else {
 			ic.PlainSecret, err = base64.StdEncoding.DecodeString(string(pubKeBytes))
 			if err != nil {
-				return Image{}, err
+				return Image{}, errors.Wrapf(err,
+					"failed to decode public encryption key")
 			}
 		}
 	}
