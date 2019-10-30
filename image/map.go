@@ -81,6 +81,12 @@ func (img *Image) Map() (map[string]interface{}, error) {
 	}
 	m["tlvs"] = tlvMaps
 
+	protTlvMaps := []map[string]interface{}{}
+	for i, tlv := range img.ProtTlvs {
+		protTlvMaps = append(protTlvMaps, tlv.Map(i, offs.ProtTlvs[i]))
+	}
+	m["prot_tlvs"] = protTlvMaps
+
 	return m, nil
 }
 
