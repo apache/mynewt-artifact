@@ -49,6 +49,32 @@ func (img *Image) verifyHashDecrypted() error {
 	return nil
 }
 
+// verifyAesNonce verifies an image's AES-Nonce TLV.  The AES-Nonce TLV
+// contains a truncated hash calculated over the image body.  This function
+// returns true if the hash was verified; false if the image does not contain
+// an AES-Nonce TLV.  It returns an error on hash mismatch.
+func (img *Image) verifyAesNonce() (bool, error) {
+	tlvs := img.FindTlvs(IMAGE_TLV_AES_NONCE)
+	switch len(tlvs) {
+	case 0:
+		return false, nil
+
+	case 1:
+		hash := GenerateAesNonce(img.Body)
+		if !bytes.Equal(tlvs[0].Data, hash) {
+			return false, errors.Errorf(
+				"image contains incorrect AES nonce: have=%x want=%x",
+				tlvs[0].Data, hash)
+		}
+		return true, nil
+
+	default:
+		return false, errors.Errorf(
+			"image contains too many AES-Nonce TLVs: have=%d want<=1",
+			len(tlvs))
+	}
+}
+
 func (img *Image) verifyEncState() ([]byte, error) {
 	secret, err := img.CollectSecret()
 	if err != nil {
@@ -97,6 +123,18 @@ func (img *Image) VerifyStructure() error {
 // was used to decrypt the image, or -1 if none.  An error is returned if the
 // hash is incorrect.
 func (img *Image) VerifyHash(privEncKeys []sec.PrivEncKey) (int, error) {
+	// If the image contains an AES-Nonce TLV, this TLV's contents are the hash
+	// of the *encrypted* image.
+	verified, err := img.verifyAesNonce()
+	if err != nil {
+		return -1, err
+	}
+	if verified {
+		return -1, nil
+	}
+
+	// Otherwise, verify the SHA256 of the *decrypted* image.
+
 	secret, err := img.verifyEncState()
 	if err != nil {
 		return -1, err

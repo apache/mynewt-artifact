@@ -289,6 +289,11 @@ func GeneratePlainSecret() ([]byte, error) {
 	return plainSecret, nil
 }
 
+func GenerateAesNonce(imageBody []byte) []byte {
+	hash := sha256.Sum256(imageBody)
+	return hash[:8]
+}
+
 func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic := NewImageCreator()
 
@@ -319,8 +324,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	}
 
 	if ic.HWKeyIndex >= 0 {
-		hash := sha256.Sum256(ic.Body)
-		ic.Nonce = hash[:8]
+		ic.Nonce = GenerateAesNonce(ic.Body)
 	}
 
 	if opts.SrcEncKeyFilename != "" {
@@ -504,7 +508,8 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.Body = append(img.Body, ic.Body...)
 	}
 
-	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload, img.ProtTlvs)
+	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload,
+		img.ProtTlvs)
 	if err != nil {
 		return img, err
 	}
