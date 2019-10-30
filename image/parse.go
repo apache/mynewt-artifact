@@ -145,6 +145,27 @@ func parseRawTlv(imgData []byte, offset int) (ImageTlv, int, error) {
 	return tlv, IMAGE_TLV_SIZE + int(tlv.Header.Len), nil
 }
 
+func parseRawTlvs(imgData []byte, offset int, size int) ([]ImageTlv, error) {
+	var tlvs []ImageTlv
+
+	end := offset + size
+	for offset < end {
+		tlv, tlvSize, err := parseRawTlv(imgData, offset)
+		if err != nil {
+			return nil, err
+		}
+
+		tlvs = append(tlvs, tlv)
+
+		offset += tlvSize
+		if offset > end {
+			return nil, errors.Errorf("TLVs extend beyond end of image")
+		}
+	}
+
+	return tlvs, nil
+}
+
 func ParseImage(imgData []byte) (Image, error) {
 	img := Image{}
 	offset := 0
@@ -161,6 +182,26 @@ func ParseImage(imgData []byte) (Image, error) {
 	}
 	offset += size
 
+	var protTrailer *ImageTrailer
+	var protTlvs []ImageTlv
+	if hdr.ProtSz > 0 {
+		pt, size, err := parseRawTrailer(imgData, offset)
+		if err != nil {
+			return img, err
+		}
+		protTrailer = &pt
+		offset += size
+
+		tlvsLen := int(hdr.ProtSz) - IMAGE_TRAILER_SIZE
+
+		pts, err := parseRawTlvs(imgData, offset, tlvsLen)
+		if err != nil {
+			return img, err
+		}
+		protTlvs = pts
+		offset += tlvsLen
+	}
+
 	trailer, size, err := parseRawTrailer(imgData, offset)
 	if err != nil {
 		return img, err
@@ -168,6 +209,9 @@ func ParseImage(imgData []byte) (Image, error) {
 	offset += size
 
 	totalLen := IMAGE_HEADER_SIZE + len(body) + int(trailer.TlvTotLen)
+	if protTrailer != nil {
+		totalLen += int(protTrailer.TlvTotLen)
+	}
 	if len(imgData) < totalLen {
 		return img, errors.Errorf("image data truncated: have=%d want=%d",
 			len(imgData), totalLen)
@@ -176,25 +220,15 @@ func ParseImage(imgData []byte) (Image, error) {
 	// Trim excess data following image trailer.
 	imgData = imgData[:totalLen]
 
-	var tlvs []ImageTlv
-	tlvLen := IMAGE_TRAILER_SIZE
-	for offset < len(imgData) {
-		tlv, size, err := parseRawTlv(imgData, offset)
-		if err != nil {
-			return img, err
-		}
-
-		tlvs = append(tlvs, tlv)
-
-		offset += size
-		if offset > len(imgData) {
-			return img, errors.Errorf("TLVs extend beyond end of image")
-		}
-
-		tlvLen += size
+	remLen := len(imgData) - offset
+	tlvs, err := parseRawTlvs(imgData, offset, remLen)
+	if err != nil {
+		return img, err
 	}
 
-	if int(trailer.TlvTotLen) != tlvLen {
+	tlvLen := IMAGE_TRAILER_SIZE
+
+	if int(trailer.TlvTotLen) != IMAGE_TRAILER_SIZE+remLen {
 		return img, errors.Errorf(
 			"invalid image: trailer indicates TLV-length=%d; actual=%d",
 			trailer.TlvTotLen, tlvLen)
@@ -203,6 +237,7 @@ func ParseImage(imgData []byte) (Image, error) {
 	img.Header = hdr
 	img.Body = body
 	img.Tlvs = tlvs
+	img.ProtTlvs = protTlvs
 
 	return img, nil
 }
