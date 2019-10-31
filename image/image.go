@@ -313,7 +313,125 @@ func (i *Image) RemoveTlvsWithType(tlvType uint8) []ImageTlv {
 	})
 }
 
-// ProtTrailer constructs a protected ImageTrailer corresponding to the given image.
+// FindProtTlvIndicesIf searches an image for TLVs satisfying the given
+// predicate and returns their indices.
+func (img *Image) FindProtTlvIndicesIf(pred func(tlv ImageTlv) bool) []int {
+	var idxs []int
+
+	for i, tlv := range img.ProtTlvs {
+		if pred(tlv) {
+			idxs = append(idxs, i)
+		}
+	}
+
+	return idxs
+}
+
+// FindProtTlvIndices searches an image for TLVs of the specified type and
+// returns their indices.
+func (img *Image) FindProtTlvIndices(tlvType uint8) []int {
+	return img.FindProtTlvIndicesIf(func(tlv ImageTlv) bool {
+		return tlv.Header.Type == tlvType
+	})
+}
+
+// FindTlvIndices searches an image for TLVs satisfying the given predicate and
+// returns them.
+func (img *Image) FindProtTlvsIf(pred func(tlv ImageTlv) bool) []*ImageTlv {
+	var tlvs []*ImageTlv
+
+	idxs := img.FindProtTlvIndicesIf(pred)
+	for _, idx := range idxs {
+		tlvs = append(tlvs, &img.Tlvs[idx])
+	}
+
+	return tlvs
+}
+
+// FindProtTlvs retrieves all TLVs in an image's footer with the specified type.
+func (img *Image) FindProtTlvs(tlvType uint8) []*ImageTlv {
+	var tlvs []*ImageTlv
+
+	idxs := img.FindProtTlvIndices(tlvType)
+	for _, idx := range idxs {
+		tlvs = append(tlvs, &img.Tlvs[idx])
+	}
+
+	return tlvs
+}
+
+// FindProtUniqueTlv retrieves a TLV in an image's footer with the specified
+// type.  It returns an error if there is more than one TLV with this type.
+func (i *Image) FindProtUniqueTlv(tlvType uint8) (*ImageTlv, error) {
+	tlvs := i.FindProtTlvs(tlvType)
+	if len(tlvs) == 0 {
+		return nil, nil
+	}
+	if len(tlvs) > 1 {
+		return nil, errors.Errorf("image contains %d TLVs with type %d",
+			len(tlvs), tlvType)
+	}
+
+	return tlvs[0], nil
+}
+
+// RemoveProtTlvsIf removes all TLVs from an image that satisfy the supplied
+// predicate.  It returns a slice of the removed TLVs.
+func (i *Image) RemoveProtTlvsIf(pred func(tlv ImageTlv) bool) []ImageTlv {
+	rmed := []ImageTlv{}
+
+	for idx := 0; idx < len(i.ProtTlvs); {
+		tlv := i.ProtTlvs[idx]
+		if pred(tlv) {
+			rmed = append(rmed, tlv)
+			i.ProtTlvs = append(i.ProtTlvs[:idx], i.ProtTlvs[idx+1:]...)
+		} else {
+			idx++
+		}
+	}
+
+	return rmed
+}
+
+// RemoveProtTlvsWithType removes from an image all TLVs with the specified
+// type.  It returns a slice of the removed TLVs.
+func (i *Image) RemoveProtTlvsWithType(tlvType uint8) []ImageTlv {
+	return i.RemoveProtTlvsIf(func(tlv ImageTlv) bool {
+		return tlv.Header.Type == tlvType
+	})
+}
+
+func (i *Image) FindAllTlvsIf(pred func(tlv ImageTlv) bool) []*ImageTlv {
+	regTlvs := i.FindTlvsIf(pred)
+	protTlvs := i.FindProtTlvsIf(pred)
+
+	return append(regTlvs, protTlvs...)
+}
+
+func (i *Image) FindAllTlvs(tlvType uint8) []*ImageTlv {
+	return i.FindAllTlvsIf(func(tlv ImageTlv) bool {
+		return tlv.Header.Type == tlvType
+	})
+}
+
+func (i *Image) FindAllUniqueTlv(tlvType uint8) (*ImageTlv, error) {
+	tlvs := i.FindAllTlvs(tlvType)
+
+	if len(tlvs) == 0 {
+		return nil, nil
+	}
+
+	if len(tlvs) > 1 {
+		return nil, errors.Errorf(
+			"image contains too many TLVs with type %d: have=%d want<=1",
+			tlvType, len(tlvs))
+	}
+
+	return tlvs[0], nil
+}
+
+// ProtTrailer constructs a protected ImageTrailer corresponding to the given
+// image.
 func (img *Image) ProtTrailer() ImageTrailer {
 	trailer := ImageTrailer{
 		Magic:     IMAGE_PROT_TRAILER_MAGIC,
