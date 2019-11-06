@@ -129,6 +129,8 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 
 	if len(cipherSecret) == 256 {
 		encType = IMAGE_TLV_ENC_RSA
+	} else if len(cipherSecret) == 113 {
+		encType = IMAGE_TLV_ENC_EC256
 	} else if len(cipherSecret) == 24 {
 		encType = IMAGE_TLV_ENC_KEK
 	} else {

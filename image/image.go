@@ -64,6 +64,7 @@ const (
 	IMAGE_TLV_ED25519   = 0x24
 	IMAGE_TLV_ENC_RSA   = 0x30
 	IMAGE_TLV_ENC_KEK   = 0x31
+	IMAGE_TLV_ENC_EC256 = 0x32
 	IMAGE_TLV_AES_NONCE = 0x50
 	IMAGE_TLV_SECRET_ID = 0x60
 )
@@ -78,6 +79,7 @@ var imageTlvTypeNameMap = map[uint8]string{
 	IMAGE_TLV_ED25519:   "ED25519",
 	IMAGE_TLV_ENC_RSA:   "ENC_RSA",
 	IMAGE_TLV_ENC_KEK:   "ENC_KEK",
+	IMAGE_TLV_ENC_EC256: "ENC_EC256",
 	IMAGE_TLV_AES_NONCE: "AES_NONCE",
 	IMAGE_TLV_SECRET_ID: "SEC_KEY_ID",
 }
@@ -171,7 +173,8 @@ func ImageTlvTypeIsSig(tlvType uint8) bool {
 
 func ImageTlvTypeIsSecret(tlvType uint8) bool {
 	return tlvType == IMAGE_TLV_ENC_RSA ||
-		tlvType == IMAGE_TLV_ENC_KEK
+		tlvType == IMAGE_TLV_ENC_KEK ||
+		tlvType == IMAGE_TLV_ENC_EC256
 }
 
 func (ver ImageVersion) String() string {

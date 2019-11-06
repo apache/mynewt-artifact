@@ -23,11 +23,15 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"golang.org/x/crypto/hkdf"
 	"io"
 
 	keywrap "github.com/NickBall/go-aes-key-wrap"
@@ -49,6 +53,7 @@ type PrivEncKey struct {
 
 type PubEncKey struct {
 	Rsa *rsa.PublicKey
+	Ec  *ecdsa.PublicKey
 	Aes cipher.Block
 }
 
@@ -88,6 +93,8 @@ func parsePubKePem(b []byte) (PubEncKey, error) {
 	switch pub := itf.(type) {
 	case *rsa.PublicKey:
 		key.Rsa = pub
+	case *ecdsa.PublicKey:
+		key.Ec = pub
 	default:
 		return key, errors.Errorf(
 			"unknown public encryption key type: %T", pub)
@@ -130,8 +137,8 @@ func (key *PrivEncKey) PubEncKey() PubEncKey {
 }
 
 func (key *PubEncKey) AssertValid() {
-	if key.Rsa == nil && key.Aes == nil {
-		panic("invalid public encryption key; neither RSA nor AES")
+	if key.Rsa == nil && key.Aes == nil && key.Ec == nil {
+		panic("invalid public encryption key; neither RSA nor AES nor EC-P256")
 	}
 }
 
@@ -163,6 +170,40 @@ func encryptRsa(pubk *rsa.PublicKey, plainSecret []byte) ([]byte, error) {
 	return cipherSecret, nil
 }
 
+func encryptEc256(peerPubK *ecdsa.PublicKey, plainSecret []byte) ([]byte, error) {
+	pk, x, y, err := elliptic.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Could not generate ephemeral EC keypair")
+	}
+
+	pubk := elliptic.Marshal(elliptic.P256(), x, y)
+
+	shared, _ := elliptic.P256().ScalarMult(peerPubK.X, peerPubK.Y, pk)
+
+	kdf := hkdf.New(sha256.New, shared.Bytes(), nil, []byte("MCUBoot_ECIES_v1"))
+	derived := make([]byte, 48)
+	_, err = kdf.Read(derived)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error during key derivation")
+	}
+
+	cipherSecret, err := EncryptAES(plainSecret, derived[:16], nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error encrypting key")
+	}
+
+	h := hmac.New(sha256.New, derived[16:])
+	h.Write(cipherSecret)
+	mac := h.Sum(nil)
+
+	var tlv []byte
+	tlv = append(tlv, pubk...)
+	tlv = append(tlv, mac...)
+	tlv = append(tlv, cipherSecret...)
+
+	return tlv, nil
+}
+
 func encryptAes(c cipher.Block, plain []byte) ([]byte, error) {
 	ciph, err := keywrap.Wrap(c, plain)
 	if err != nil {
@@ -177,6 +218,8 @@ func (k *PubEncKey) Encrypt(plain []byte) ([]byte, error) {
 
 	if k.Rsa != nil {
 		return encryptRsa(k.Rsa, plain)
+	} else if k.Ec != nil {
+		return encryptEc256(k.Ec, plain)
 	} else {
 		return encryptAes(k.Aes, plain)
 	}
