@@ -80,6 +80,7 @@ type MfgManifest struct {
 	EraseVal   byte              `json:"erase_val"`
 	Signatures []MfgManifestSig  `json:"signatures,omitempty"`
 	FlashAreas []flash.FlashArea `json:"flash_map"`
+	FlashNames []string          `json:"flash_names",omitempty`
 
 	Targets []MfgManifestTarget `json:"targets"`
 	Raws    []MfgManifestRaw    `json:"raws"`
