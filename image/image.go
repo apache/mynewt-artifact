@@ -345,7 +345,7 @@ func (img *Image) FindProtTlvsIf(pred func(tlv ImageTlv) bool) []*ImageTlv {
 
 	idxs := img.FindProtTlvIndicesIf(pred)
 	for _, idx := range idxs {
-		tlvs = append(tlvs, &img.Tlvs[idx])
+		tlvs = append(tlvs, &img.ProtTlvs[idx])
 	}
 
 	return tlvs
@@ -357,7 +357,7 @@ func (img *Image) FindProtTlvs(tlvType uint8) []*ImageTlv {
 
 	idxs := img.FindProtTlvIndices(tlvType)
 	for _, idx := range idxs {
-		tlvs = append(tlvs, &img.Tlvs[idx])
+		tlvs = append(tlvs, &img.ProtTlvs[idx])
 	}
 
 	return tlvs
