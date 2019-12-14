@@ -208,7 +208,7 @@ func ParseImage(imgData []byte) (Image, error) {
 	}
 	offset += size
 
-	totalLen := IMAGE_HEADER_SIZE + len(body) + int(trailer.TlvTotLen)
+	totalLen := int(hdr.HdrSz) + len(body) + int(trailer.TlvTotLen)
 	if protTrailer != nil {
 		totalLen += int(protTrailer.TlvTotLen)
 	}
