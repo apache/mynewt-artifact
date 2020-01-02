@@ -123,12 +123,12 @@ func (img *Image) VerifyHash(privEncKeys []sec.PrivEncKey) (int, error) {
 	for i, key := range privEncKeys {
 		dec, err := Decrypt(*img, key)
 		if err != nil {
-			return -1, err
-		}
-
-		hashErr = dec.verifyHashDecrypted()
-		if hashErr == nil {
-			return i, nil
+			hashErr = err
+		} else {
+			hashErr = dec.verifyHashDecrypted()
+			if hashErr == nil {
+				return i, nil
+			}
 		}
 	}
 
