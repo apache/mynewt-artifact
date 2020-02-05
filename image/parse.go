@@ -239,6 +239,11 @@ func ParseImage(imgData []byte) (Image, error) {
 	img.Tlvs = tlvs
 	img.ProtTlvs = protTlvs
 
+	extra := img.Header.HdrSz - IMAGE_HEADER_SIZE
+	if extra > 0 {
+		img.Pad = make([]byte, extra)
+	}
+
 	return img, nil
 }
 
