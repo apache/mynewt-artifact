@@ -32,6 +32,7 @@ import (
 type MfgManifestTarget struct {
 	Name         string                 `json:"name"`
 	Offset       int                    `json:"offset"`
+	Size         int                    `json:"size"`
 	BinPath      string                 `json:"bin_path,omitempty"`
 	ImagePath    string                 `json:"image_path,omitempty"`
 	HexPath      string                 `json:"hex_path,omitempty"`
