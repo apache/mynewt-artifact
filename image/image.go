@@ -388,9 +388,15 @@ func (i *Image) RemoveProtTlvsIf(pred func(tlv ImageTlv) bool) []ImageTlv {
 		if pred(tlv) {
 			rmed = append(rmed, tlv)
 			i.ProtTlvs = append(i.ProtTlvs[:idx], i.ProtTlvs[idx+1:]...)
+
+			i.Header.ProtSz -= uint16(IMAGE_TLV_SIZE + len(tlv.Data))
 		} else {
 			idx++
 		}
+	}
+
+	if len(i.ProtTlvs) == 0 {
+		i.Header.ProtSz = 0
 	}
 
 	return rmed
@@ -723,6 +729,45 @@ func Decrypt(img Image, privEncKey sec.PrivEncKey) (Image, error) {
 	dup.Body = body
 
 	return dup, nil
+}
+
+// DecryptHw decrypts a hardware-encrypted image.  It does NOT strip the
+// "nonce" or "secret ID" protected TLVs.
+func DecryptHw(img Image, secret []byte) (Image, error) {
+	dup := img.Clone()
+
+	tlvs := dup.FindProtTlvs(IMAGE_TLV_AES_NONCE)
+	if len(tlvs) != 1 {
+		return dup, errors.Errorf(
+			"failed to decrypt hw-encrypted image: "+
+				"wrong count of AES nonce TLVs; have=%d want=1", len(tlvs))
+	}
+	nonce := tlvs[0].Data
+
+	body, err := sec.EncryptAES(dup.Body, secret, nonce)
+	if err != nil {
+		return dup, err
+	}
+
+	dup.Body = body
+
+	return dup, nil
+}
+
+// DecryptHw decrypts a hardware-encrypted image and strips the "nonce" and
+// "secret ID" protected TLVs.
+func DecryptHwFull(img Image, secret []byte) (Image, error) {
+	var err error
+
+	img, err = DecryptHw(img, secret)
+	if err != nil {
+		return img, err
+	}
+
+	img.RemoveProtTlvsWithType(IMAGE_TLV_AES_NONCE)
+	img.RemoveProtTlvsWithType(IMAGE_TLV_SECRET_ID)
+
+	return img, nil
 }
 
 // IsEncrypted indicates whether an image's "encrypted" flag is set.
