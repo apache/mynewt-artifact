@@ -35,7 +35,7 @@ func (img *Image) verifyHashDecrypted() error {
 		return err
 	}
 
-	wantHash, err := img.CalcHash()
+	wantHash, err := img.CalcHash(nil)
 	if err != nil {
 		return err
 	}
