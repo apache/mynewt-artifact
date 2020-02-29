@@ -487,8 +487,6 @@ func (ic *ImageCreator) Create() (Image, error) {
 
 	img.Header.ProtSz = calcProtSize(img.ProtTlvs)
 
-	payload := &ic.Body
-
 	// Followed by data.
 	if ic.PlainSecret != nil {
 		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
@@ -496,16 +494,11 @@ func (ic *ImageCreator) Create() (Image, error) {
 			return img, err
 		}
 		img.Body = append(img.Body, encBody...)
-
-		if ic.HWKeyIndex >= 0 {
-			payload = &encBody
-		}
-
 	} else {
 		img.Body = append(img.Body, ic.Body...)
 	}
 
-	hashBytes, err := calcHash(ic.InitialHash, img.Header, img.Pad, *payload, img.ProtTlvs)
+	hashBytes, err := img.CalcHash(ic.InitialHash)
 	if err != nil {
 		return img, err
 	}

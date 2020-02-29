@@ -475,9 +475,10 @@ func (i *Image) Hash() ([]byte, error) {
 	return tlv.Data, nil
 }
 
-// CalcHash calculates a SHA256 of the given image.
-func (i *Image) CalcHash() ([]byte, error) {
-	return calcHash(nil, i.Header, i.Pad, i.Body, i.ProtTlvs)
+// CalcHash calculates a SHA256 of the given image.  initialHash should be nil
+// for non-split-images.
+func (i *Image) CalcHash(initialHash []byte) ([]byte, error) {
+	return calcHash(initialHash, i.Header, i.Pad, i.Body, i.ProtTlvs)
 }
 
 // WritePlusOffsets writes a binary image to the given writer.  It returns
