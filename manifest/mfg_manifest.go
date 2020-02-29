@@ -148,6 +148,22 @@ func (m *MfgManifest) FindFlashAreaDevOff(device int, offset int) *flash.FlashAr
 	return nil
 }
 
+// FindWithinFlashAreaDevOff searches an mfg manifest for a flash area with the
+// specified device that contains the given offset.
+func (m *MfgManifest) FindWithinFlashAreaDevOff(device int, offset int) *flash.FlashArea {
+	for i, _ := range m.FlashAreas {
+		fa := &m.FlashAreas[i]
+		if fa.Device == device {
+			end := fa.Offset + fa.Size
+			if offset >= offset && offset < end {
+				return fa
+			}
+		}
+	}
+
+	return nil
+}
+
 // FindFlashAreaName searches an mfg manifest for a flash area with the
 // specified name.
 func (m *MfgManifest) FindFlashAreaName(name string) *flash.FlashArea {
