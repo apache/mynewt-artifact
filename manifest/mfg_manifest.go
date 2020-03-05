@@ -155,7 +155,7 @@ func (m *MfgManifest) FindWithinFlashAreaDevOff(device int, offset int) *flash.F
 		fa := &m.FlashAreas[i]
 		if fa.Device == device {
 			end := fa.Offset + fa.Size
-			if offset >= offset && offset < end {
+			if offset >= fa.Offset && offset < end {
 				return fa
 			}
 		}
