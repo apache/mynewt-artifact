@@ -31,8 +31,9 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
-	"golang.org/x/crypto/hkdf"
 	"io"
+
+	"golang.org/x/crypto/hkdf"
 
 	keywrap "github.com/NickBall/go-aes-key-wrap"
 	"github.com/apache/mynewt-artifact/errors"
@@ -251,17 +252,18 @@ func (k *PrivEncKey) Decrypt(ciph []byte) ([]byte, error) {
 }
 
 func EncryptAES(plain []byte, secret []byte, nonce []byte) ([]byte, error) {
+	if len(nonce) > 16 {
+		return nil, errors.Errorf("AES nonce has invalid length: have=%d want<=16", len(nonce))
+	}
+
 	blk, err := aes.NewCipher(secret)
 	if err != nil {
 		return nil, errors.Errorf("Failed to create block cipher")
 	}
 
-	var iv []byte
-	if nonce == nil {
-		iv = make([]byte, 16)
-	} else {
-		zeros := make([]byte, 8)
-		iv = append(nonce, zeros...)
+	iv := nonce
+	for len(iv) < 16 {
+		iv = append(nonce, 0)
 	}
 
 	stream := cipher.NewCTR(blk, iv)
