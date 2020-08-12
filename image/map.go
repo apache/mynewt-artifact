@@ -31,6 +31,7 @@ func (h *ImageHdr) Map(offset int) map[string]interface{} {
 		"_offset": offset,
 		"flags":   h.Flags,
 		"hdr_sz":  h.HdrSz,
+		"prot_sz": h.ProtSz,
 		"img_sz":  h.ImgSz,
 		"magic":   h.Magic,
 		"vers":    h.Vers.String(),
@@ -72,6 +73,12 @@ func (img *Image) Map() (map[string]interface{}, error) {
 	m := map[string]interface{}{}
 	m["header"] = img.Header.Map(offs.Header)
 	m["body"] = rawBodyMap(offs.Body)
+
+	if img.Header.ProtSz > 0 {
+		protTrailer := img.ProtTrailer()
+		m["prot_trailer"] = protTrailer.Map(offs.ProtTrailer)
+	}
+
 	trailer := img.Trailer()
 	m["trailer"] = trailer.Map(offs.Trailer)
 
