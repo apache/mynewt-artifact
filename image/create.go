@@ -100,6 +100,7 @@ func sigTlvType(key sec.PrivSignKey) uint8 {
 	}
 }
 
+// GenerateHWKeyIndexTLV creates a hardware key index TLV.
 func GenerateHWKeyIndexTLV(secretIndex uint32) (ImageTlv, error) {
 	id := make([]byte, 4)
 	binary.LittleEndian.PutUint32(id, secretIndex)
@@ -113,6 +114,7 @@ func GenerateHWKeyIndexTLV(secretIndex uint32) (ImageTlv, error) {
 	}, nil
 }
 
+// GenerateNonceTLV creates a nonce TLV given a nonce.
 func GenerateNonceTLV(nonce []byte) (ImageTlv, error) {
 	return ImageTlv{
 		Header: ImageTlvHdr{
@@ -124,6 +126,7 @@ func GenerateNonceTLV(nonce []byte) (ImageTlv, error) {
 	}, nil
 }
 
+// GenerateEncTlv creates an encryption-secret TLV given a secret.
 func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 	var encType uint8
 
@@ -147,6 +150,7 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 	}, nil
 }
 
+// GenerateSig signs an image using an rsa key.
 func GenerateSigRsa(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	opts := rsa.PSSOptions{
 		SaltLength: rsa.PSSSaltLengthEqualsHash,
@@ -160,6 +164,7 @@ func GenerateSigRsa(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
+// GenerateSig signs an image using an ec key.
 func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	r, s, err := ecdsa.Sign(rand.Reader, key.Ec, hash)
 	if err != nil {
@@ -187,6 +192,7 @@ func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	return signature, nil
 }
 
+// GenerateSig signs an image using an ed25519 key.
 func GenerateSigEd25519(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	sig := ed25519.Sign(*key.Ed25519, hash)
 
@@ -199,6 +205,7 @@ func GenerateSigEd25519(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 	return sig, nil
 }
 
+// GenerateSig signs an image.
 func GenerateSig(key sec.PrivSignKey, hash []byte) (sec.Sig, error) {
 	pub := key.PubKey()
 	typ, err := pub.SigType()
@@ -238,6 +245,8 @@ func GenerateSig(key sec.PrivSignKey, hash []byte) (sec.Sig, error) {
 	}, nil
 }
 
+// BuildKeyHash produces a key-hash TLV given a public verification key.  Users
+// do not normally need to call this.  Call BuildSigTlvs instead.
 func BuildKeyHashTlv(keyBytes []byte) ImageTlv {
 	data := sec.RawKeyHash(keyBytes)
 	return ImageTlv{
@@ -250,6 +259,8 @@ func BuildKeyHashTlv(keyBytes []byte) ImageTlv {
 	}
 }
 
+// BuildSigTlvs signs an image and creates a pair of TLVs representing the
+// signature.
 func BuildSigTlvs(keys []sec.PrivSignKey, hash []byte) ([]ImageTlv, error) {
 	var tlvs []ImageTlv
 
@@ -282,6 +293,7 @@ func BuildSigTlvs(keys []sec.PrivSignKey, hash []byte) ([]ImageTlv, error) {
 	return tlvs, nil
 }
 
+// GeneratePlainSecret randomly generates a 16-byte image-encrypting secret.
 func GeneratePlainSecret() ([]byte, error) {
 	plainSecret := make([]byte, 16)
 	if _, err := rand.Read(plainSecret); err != nil {
@@ -291,6 +303,7 @@ func GeneratePlainSecret() ([]byte, error) {
 	return plainSecret, nil
 }
 
+// GenerateImage produces an Image object from a set of image creation options.
 func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic := NewImageCreator()
 
@@ -365,6 +378,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	return ri, nil
 }
 
+// calcHash calculates the sha256 for an image with the given components.
 func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
 	plainBody []byte, protTlvs []ImageTlv) ([]byte, error) {
 
@@ -422,6 +436,7 @@ func calcHash(initialHash []byte, hdr ImageHdr, pad []byte,
 	return hash.Sum(nil), nil
 }
 
+// calcProtSize calculates the size, in bytes, of a set of protected TLVs.
 func calcProtSize(protTlvs []ImageTlv) uint16 {
 	var size = uint16(0)
 	for _, tlv := range protTlvs {
@@ -434,6 +449,7 @@ func calcProtSize(protTlvs []ImageTlv) uint16 {
 	return size
 }
 
+// Create produces an Image object.
 func (ic *ImageCreator) Create() (Image, error) {
 	img := Image{}
 
