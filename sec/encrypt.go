@@ -263,7 +263,7 @@ func EncryptAES(plain []byte, secret []byte, nonce []byte) ([]byte, error) {
 
 	iv := nonce
 	for len(iv) < 16 {
-		iv = append(nonce, 0)
+		iv = append(iv, 0)
 	}
 
 	stream := cipher.NewCTR(blk, iv)
