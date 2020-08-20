@@ -52,15 +52,16 @@ type ImageCreator struct {
 }
 
 type ImageCreateOpts struct {
-	SrcBinFilename    string
-	SrcEncKeyFilename string
-	SrcEncKeyIndex    int
-	Version           ImageVersion
-	SigKeys           []sec.PrivSignKey
-	Sections          []Section
-	LoaderHash        []byte
-	HdrPad            int
-	ImagePad          int
+	SrcBinFilename           string
+	SrcEncKeyFilename        string
+	SrcEncKeyIndex           int
+	SrcExtraManifestFilename string
+	Version                  ImageVersion
+	SigKeys                  []sec.PrivSignKey
+	Sections                 []Section
+	LoaderHash               []byte
+	HdrPad                   int
+	ImagePad                 int
 }
 
 type ECDSASig struct {
@@ -154,17 +155,17 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 
 // GenerateEncTlv creates an encryption-secret TLV given a secret.
 func GenerateSectionTlv(section Section) (ImageTlv, error) {
-	data := make([]byte, 8 + len(section.Name))
+	data := make([]byte, 8+len(section.Name))
 
 	binary.LittleEndian.PutUint32(data[0:], uint32(section.Offset))
 	binary.LittleEndian.PutUint32(data[4:], uint32(section.Size))
 	copy(data[8:], section.Name)
 
-	return ImageTlv {
+	return ImageTlv{
 		Header: ImageTlvHdr{
 			Type: IMAGE_TLV_SECTION,
-			Pad: 0,
-			Len: uint16(len(data)),
+			Pad:  0,
+			Len:  uint16(len(data)),
 		},
 		Data: data,
 	}, nil

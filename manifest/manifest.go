@@ -64,19 +64,20 @@ type ManifestRepo struct {
 }
 
 type Manifest struct {
-	Name       string            `json:"name"`
-	Date       string            `json:"build_time"`
-	Version    string            `json:"build_version"`
-	BuildID    string            `json:"id"`
-	Image      string            `json:"image"`
-	ImageHash  string            `json:"image_hash"`
-	Loader     string            `json:"loader"`
-	LoaderHash string            `json:"loader_hash"`
-	Pkgs       []*ManifestPkg    `json:"pkgs"`
-	LoaderPkgs []*ManifestPkg    `json:"loader_pkgs,omitempty"`
-	TgtVars    []string          `json:"target"`
-	Repos      []*ManifestRepo   `json:"repos"`
-	Syscfg     map[string]string `json:"syscfg"`
+	Name       string                 `json:"name"`
+	Date       string                 `json:"build_time"`
+	Version    string                 `json:"build_version"`
+	BuildID    string                 `json:"id"`
+	Image      string                 `json:"image"`
+	ImageHash  string                 `json:"image_hash"`
+	Loader     string                 `json:"loader"`
+	LoaderHash string                 `json:"loader_hash"`
+	Pkgs       []*ManifestPkg         `json:"pkgs"`
+	LoaderPkgs []*ManifestPkg         `json:"loader_pkgs,omitempty"`
+	TgtVars    []string               `json:"target"`
+	Repos      []*ManifestRepo        `json:"repos"`
+	Syscfg     map[string]string      `json:"syscfg"`
+	Extra      map[string]interface{} `json:"extra"`
 
 	PkgSizes       []*ManifestSizePkg `json:"pkgsz"`
 	LoaderPkgSizes []*ManifestSizePkg `json:"loader_pkgsz,omitempty"`
