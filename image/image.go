@@ -67,6 +67,7 @@ const (
 	IMAGE_TLV_ENC_EC256 = 0x32
 	IMAGE_TLV_AES_NONCE = 0x50
 	IMAGE_TLV_SECRET_ID = 0x60
+	IMAGE_TLV_SECTION   = 0xa3
 )
 
 var imageTlvTypeNameMap = map[uint8]string{
@@ -82,6 +83,7 @@ var imageTlvTypeNameMap = map[uint8]string{
 	IMAGE_TLV_ENC_EC256: "ENC_EC256",
 	IMAGE_TLV_AES_NONCE: "AES_NONCE",
 	IMAGE_TLV_SECRET_ID: "SEC_KEY_ID",
+	IMAGE_TLV_SECTION:   "SECTION",
 }
 
 var imageTlvTypeSigTypeMap = map[uint8]sec.SigType{
@@ -142,6 +144,12 @@ type ImageOffsets struct {
 	ProtTlvs    []int
 	Tlvs        []int
 	TotalSize   int
+}
+
+type Section struct {
+	Name   string
+	Size   int
+	Offset int
 }
 
 func ImageTlvTypeIsValid(tlvType uint8) bool {
