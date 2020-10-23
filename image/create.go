@@ -41,6 +41,7 @@ type ImageCreator struct {
 	Body         []byte
 	Version      ImageVersion
 	SigKeys      []sec.PrivSignKey
+	Sections     []Section
 	HWKeyIndex   int
 	Nonce        []byte
 	PlainSecret  []byte
@@ -56,6 +57,7 @@ type ImageCreateOpts struct {
 	SrcEncKeyIndex    int
 	Version           ImageVersion
 	SigKeys           []sec.PrivSignKey
+	Sections          []Section
 	LoaderHash        []byte
 	HdrPad            int
 	ImagePad          int
@@ -147,6 +149,24 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 			Len:  uint16(len(cipherSecret)),
 		},
 		Data: cipherSecret,
+	}, nil
+}
+
+// GenerateEncTlv creates an encryption-secret TLV given a secret.
+func GenerateSectionTlv(section Section) (ImageTlv, error) {
+	data := make([]byte, 8 + len(section.Name))
+
+	binary.LittleEndian.PutUint32(data[0:], uint32(section.Offset))
+	binary.LittleEndian.PutUint32(data[4:], uint32(section.Size))
+	copy(data[8:], section.Name)
+
+	return ImageTlv {
+		Header: ImageTlvHdr{
+			Type: IMAGE_TLV_SECTION,
+			Pad: 0,
+			Len: uint16(len(data)),
+		},
+		Data: data,
 	}, nil
 }
 
@@ -316,6 +336,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic.Version = opts.Version
 	ic.SigKeys = opts.SigKeys
 	ic.HWKeyIndex = opts.SrcEncKeyIndex
+	ic.Sections = opts.Sections
 
 	if opts.LoaderHash != nil {
 		ic.InitialHash = opts.LoaderHash
@@ -495,6 +516,14 @@ func (ic *ImageCreator) Create() (Image, error) {
 		img.ProtTlvs = append(img.ProtTlvs, tlv)
 
 		tlv, err = GenerateNonceTLV(ic.Nonce)
+		if err != nil {
+			return img, err
+		}
+		img.ProtTlvs = append(img.ProtTlvs, tlv)
+	}
+
+	for s := range ic.Sections {
+		tlv, err := GenerateSectionTlv(ic.Sections[s])
 		if err != nil {
 			return img, err
 		}
