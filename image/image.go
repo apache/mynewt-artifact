@@ -750,9 +750,15 @@ func DecryptHw(img Image, secret []byte) (Image, error) {
 
 	tlvs := dup.FindProtTlvs(IMAGE_TLV_AES_NONCE)
 	if len(tlvs) != 1 {
-		return dup, errors.Errorf(
-			"failed to decrypt hw-encrypted image: "+
-				"wrong count of AES nonce TLVs; have=%d want=1", len(tlvs))
+		// try to find legacy TLV
+		tlvs := dup.FindProtTlvs(IMAGE_TLV_AES_NONCE_LEGACY)
+
+		if len(tlvs) != 1 {
+
+			return dup, errors.Errorf(
+				"failed to decrypt hw-encrypted image: "+
+					"wrong count of AES nonce TLVs; have=%d want=1", len(tlvs))
+		}
 	}
 	nonce := tlvs[0].Data
 
@@ -778,6 +784,8 @@ func DecryptHwFull(img Image, secret []byte) (Image, error) {
 
 	img.RemoveProtTlvsWithType(IMAGE_TLV_AES_NONCE)
 	img.RemoveProtTlvsWithType(IMAGE_TLV_SECRET_ID)
+	img.RemoveProtTlvsWithType(IMAGE_TLV_AES_NONCE_LEGACY)
+	img.RemoveProtTlvsWithType(IMAGE_TLV_SECRET_ID_LEGACY)
 
 	return img, nil
 }

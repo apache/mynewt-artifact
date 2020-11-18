@@ -49,6 +49,7 @@ type ImageCreator struct {
 	HeaderSize   int
 	InitialHash  []byte
 	Bootable     bool
+	UseLegacyTLV bool
 }
 
 type ImageCreateOpts struct {
@@ -61,6 +62,7 @@ type ImageCreateOpts struct {
 	LoaderHash        []byte
 	HdrPad            int
 	ImagePad          int
+	UseLegacyTLV      bool
 }
 
 type ECDSASig struct {
@@ -103,12 +105,20 @@ func sigTlvType(key sec.PrivSignKey) uint8 {
 }
 
 // GenerateHWKeyIndexTLV creates a hardware key index TLV.
-func GenerateHWKeyIndexTLV(secretIndex uint32) (ImageTlv, error) {
+func GenerateHWKeyIndexTLV(secretIndex uint32, useLegacyTLV bool) (ImageTlv, error) {
+	var tlvType uint8
 	id := make([]byte, 4)
 	binary.LittleEndian.PutUint32(id, secretIndex)
+
+	if useLegacyTLV {
+		tlvType = IMAGE_TLV_SECRET_ID_LEGACY
+	} else {
+		tlvType = IMAGE_TLV_SECRET_ID
+	}
+
 	return ImageTlv{
 		Header: ImageTlvHdr{
-			Type: IMAGE_TLV_SECRET_ID,
+			Type: tlvType,
 			Pad:  0,
 			Len:  uint16(len(id)),
 		},
@@ -117,10 +127,18 @@ func GenerateHWKeyIndexTLV(secretIndex uint32) (ImageTlv, error) {
 }
 
 // GenerateNonceTLV creates a nonce TLV given a nonce.
-func GenerateNonceTLV(nonce []byte) (ImageTlv, error) {
+func GenerateNonceTLV(nonce []byte, useLegacyTLV bool) (ImageTlv, error) {
+	var tlvType uint8
+
+	if useLegacyTLV {
+		tlvType = IMAGE_TLV_AES_NONCE_LEGACY
+	} else {
+		tlvType = IMAGE_TLV_AES_NONCE
+	}
+
 	return ImageTlv{
 		Header: ImageTlvHdr{
-			Type: IMAGE_TLV_AES_NONCE,
+			Type: tlvType,
 			Pad:  0,
 			Len:  uint16(len(nonce)),
 		},
@@ -154,17 +172,17 @@ func GenerateEncTlv(cipherSecret []byte) (ImageTlv, error) {
 
 // GenerateEncTlv creates an encryption-secret TLV given a secret.
 func GenerateSectionTlv(section Section) (ImageTlv, error) {
-	data := make([]byte, 8 + len(section.Name))
+	data := make([]byte, 8+len(section.Name))
 
 	binary.LittleEndian.PutUint32(data[0:], uint32(section.Offset))
 	binary.LittleEndian.PutUint32(data[4:], uint32(section.Size))
 	copy(data[8:], section.Name)
 
-	return ImageTlv {
+	return ImageTlv{
 		Header: ImageTlvHdr{
 			Type: IMAGE_TLV_SECTION,
-			Pad: 0,
-			Len: uint16(len(data)),
+			Pad:  0,
+			Len:  uint16(len(data)),
 		},
 		Data: data,
 	}, nil
@@ -337,6 +355,7 @@ func GenerateImage(opts ImageCreateOpts) (Image, error) {
 	ic.SigKeys = opts.SigKeys
 	ic.HWKeyIndex = opts.SrcEncKeyIndex
 	ic.Sections = opts.Sections
+	ic.UseLegacyTLV = opts.UseLegacyTLV
 
 	if opts.LoaderHash != nil {
 		ic.InitialHash = opts.LoaderHash
@@ -509,13 +528,14 @@ func (ic *ImageCreator) Create() (Image, error) {
 	}
 
 	if ic.HWKeyIndex >= 0 {
-		tlv, err := GenerateHWKeyIndexTLV(uint32(ic.HWKeyIndex))
+		tlv, err := GenerateHWKeyIndexTLV(uint32(ic.HWKeyIndex),
+			ic.UseLegacyTLV)
 		if err != nil {
 			return img, err
 		}
 		img.ProtTlvs = append(img.ProtTlvs, tlv)
 
-		tlv, err = GenerateNonceTLV(ic.Nonce)
+		tlv, err = GenerateNonceTLV(ic.Nonce, ic.UseLegacyTLV)
 		if err != nil {
 			return img, err
 		}
