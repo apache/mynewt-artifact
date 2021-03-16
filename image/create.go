@@ -553,19 +553,28 @@ func (ic *ImageCreator) Create() (Image, error) {
 	img.Header.ProtSz = calcProtSize(img.ProtTlvs)
 
 	// Followed by data.
+	var hashBytes []byte
+	var err error
 	if ic.PlainSecret != nil {
+		// For encrypted images, must calculate the hash with the plain
+		// body and encrypt the payload afterwards
+		img.Body = append(img.Body, ic.Body...)
+		hashBytes, err = img.CalcHash(ic.InitialHash)
+		if err != nil {
+			return img, err
+		}
 		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
 		if err != nil {
 			return img, err
 		}
+		img.Body = nil
 		img.Body = append(img.Body, encBody...)
 	} else {
 		img.Body = append(img.Body, ic.Body...)
-	}
-
-	hashBytes, err := img.CalcHash(ic.InitialHash)
-	if err != nil {
-		return img, err
+		hashBytes, err = img.CalcHash(ic.InitialHash)
+		if err != nil {
+			return img, err
+		}
 	}
 
 	// Hash TLV.
