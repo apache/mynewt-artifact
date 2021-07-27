@@ -20,6 +20,8 @@
 package image
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -793,4 +795,21 @@ func DecryptHwFull(img Image, secret []byte) (Image, error) {
 // IsEncrypted indicates whether an image's "encrypted" flag is set.
 func (img *Image) IsEncrypted() bool {
 	return img.Header.Flags&IMAGE_F_ENCRYPTED != 0
+}
+
+func (img *Image) Bin() ([]byte, error) {
+	b := &bytes.Buffer{}
+	w := bufio.NewWriter(b)
+
+	_, err := img.Write(w)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.Flush()
+	if err != nil {
+		return nil, err
+	}
+
+	return b.Bytes(), nil
 }
