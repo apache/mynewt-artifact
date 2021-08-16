@@ -813,3 +813,27 @@ func (img *Image) Bin() ([]byte, error) {
 
 	return b.Bytes(), nil
 }
+
+// HasEncryptionPayload indicates whether an image's contains a HW encryption payload.
+func (img *Image) HasEncryptionPayload() bool {
+	enc := false
+	res, _ := img.FindAllUniqueTlv(IMAGE_TLV_SECRET_ID_LEGACY)
+	if res != nil {
+		nonce, _ := img.FindAllUniqueTlv(IMAGE_TLV_AES_NONCE_LEGACY)
+		if nonce != nil {
+			enc = true
+		}
+
+	}
+	if !enc {
+		res, _ = img.FindAllUniqueTlv(IMAGE_TLV_SECRET_ID)
+		if res != nil {
+			nonce, _ := img.FindAllUniqueTlv(IMAGE_TLV_AES_NONCE)
+			if nonce != nil {
+				enc = true
+			}
+
+		}
+	}
+	return enc
+}
