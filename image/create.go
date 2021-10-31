@@ -224,9 +224,6 @@ func GenerateSigEc(key sec.PrivSignKey, hash []byte) ([]byte, error) {
 		return nil, errors.Errorf("signature truncated")
 	}
 
-	pad := make([]byte, int(sigLen)-len(signature))
-	signature = append(signature, pad...)
-
 	return signature, nil
 }
 
