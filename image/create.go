@@ -553,19 +553,33 @@ func (ic *ImageCreator) Create() (Image, error) {
 	var hashBytes []byte
 	var err error
 	if ic.PlainSecret != nil {
-		// For encrypted images, must calculate the hash with the plain
-		// body and encrypt the payload afterwards
-		img.Body = append(img.Body, ic.Body...)
-		hashBytes, err = img.CalcHash(ic.InitialHash)
-		if err != nil {
-			return img, err
-		}
-		encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
-		if err != nil {
-			return img, err
-		}
-		img.Body = nil
-		img.Body = append(img.Body, encBody...)
+            if img.HasEncryptionPayload() {
+                // For an encrypted image that will be HW decrypted while running,
+                // the hash must be calculated on the encrptyed image body.
+                encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
+                if err != nil {
+                    return img, err
+                }
+                img.Body = append(img.Body, encBody...)
+                hashBytes, err = img.CalcHash(ic.InitialHash)
+                if err != nil {
+                    return img, err
+                }
+            } else {
+                // For normal encrypted images, must calculate the hash with the plain
+                // body and encrypt the payload afterwards
+                img.Body = append(img.Body, ic.Body...)
+                hashBytes, err = img.CalcHash(ic.InitialHash)
+                if err != nil {
+                    return img, err
+                }
+                encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
+                if err != nil {
+                    return img, err
+                }
+                img.Body = nil
+                img.Body = append(img.Body, encBody...)
+            }
 	} else {
 		img.Body = append(img.Body, ic.Body...)
 		hashBytes, err = img.CalcHash(ic.InitialHash)
