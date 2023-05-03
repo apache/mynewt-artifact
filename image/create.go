@@ -554,8 +554,9 @@ func (ic *ImageCreator) Create() (Image, error) {
 	var err error
 	if ic.PlainSecret != nil {
             if img.HasEncryptionPayload() {
-                // For an encrypted image that will be HW decrypted while running,
-                // the hash must be calculated on the encrptyed image body.
+                // If the image has an encryption payload, it is an encrypted image 
+                // that will be HW decrypted while running and the hash must be 
+                // calculated on the encrypted image body.
                 encBody, err := sec.EncryptAES(ic.Body, ic.PlainSecret, ic.Nonce)
                 if err != nil {
                     return img, err
